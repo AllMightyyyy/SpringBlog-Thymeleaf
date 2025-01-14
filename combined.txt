@@ -1,0 +1,2049 @@
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/config/MailConfig.java -----
+package com.example.blog.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+
+import java.util.Properties;
+
+@Configuration
+@EnableConfigurationProperties
+public class MailConfig {
+
+    @Bean
+    public JavaMailSender javaMailSender() {
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+
+        mailSender.setHost("your_smtp_server");
+        mailSender.setPort(587);
+        mailSender.setUsername("your_email");
+        mailSender.setPassword("your_password");
+
+        Properties props = mailSender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+
+        return mailSender;
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/config/WebConfig.java -----
+package com.example.blog.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry
+                .addResourceHandler("/uploads/**")
+                .addResourceLocations("file:" + uploadDir + "/");
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/config/SecurityConfig.java -----
+package com.example.blog.config;
+
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+// Import other necessary packages
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Collections;
+
+@Configuration
+public class SecurityConfig {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Bean
+    public UserDetailsService userDetailsService(){
+        return new UserDetailsService(){
+            @Override
+            public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+                com.example.blog.model.User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                return new org.springframework.security.core.userdetails.User(
+                        user.getEmail(),
+                        user.getPassword(),
+                        Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+            }
+        };
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder(){
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/register", "/login", "/css/**", "/uploads/**").permitAll()
+                        .requestMatchers("/posts/create", "/posts/*/edit").authenticated()
+                        .anyRequest().authenticated()
+                )
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/", true)
+                        .permitAll()
+                )
+                .logout(LogoutConfigurer::permitAll)
+                .exceptionHandling(exception -> exception
+                        .accessDeniedPage("/access-denied")
+                );
+        return http.build();
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/ReactionRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Reaction;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface ReactionRepository extends JpaRepository<Reaction, Long> {
+    Optional<Reaction> findByUserAndPost(User user, Post post);
+
+    // Count how many likes or dislikes a post has
+    long countByPostAndType(Post post, String type);
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/UserRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/TagRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Tag;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface TagRepository extends JpaRepository<Tag, Long> {
+    Optional<Tag> findByName(String name);
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/PostRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Post;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface PostRepository extends JpaRepository<Post, Long> {
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/SubscriptionRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Subscription;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
+    Optional<Subscription> findByUserAndPost(User user, Post post);
+    List<Subscription> findByPost(Post post);
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/repository/CommentRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Comment;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/BlogApplication.java -----
+package com.example.blog;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BlogApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(BlogApplication.class, args);
+    }
+
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/controller/TagController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Tag;
+import com.example.blog.service.TagService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+public class TagController {
+
+    private final TagService tagService;
+
+    @Autowired
+    public TagController(TagService tagService) {
+        this.tagService = tagService;
+    }
+
+    // Display a list of all tags
+    @GetMapping("/tags")
+    public String showAllTags(Model model) {
+        model.addAttribute("tags", tagService.findAll());
+        return "tags_list";
+    }
+
+    // Display all posts belonging to a specific tag
+    @GetMapping("/tags/{id}")
+    public String showPostsByTag(@PathVariable Long id, Model model) {
+        Tag tag = tagService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid tag ID: " + id));
+        model.addAttribute("tag", tag);
+        // The Post objects are accessible via tag.getPosts()
+        model.addAttribute("posts", tag.getPosts());
+        return "tag_posts";
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/controller/CommentController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Comment;
+import com.example.blog.model.Post;
+import com.example.blog.model.Subscription;
+import com.example.blog.model.User;
+import com.example.blog.service.CommentService;
+import com.example.blog.service.PostService;
+import com.example.blog.service.SubscriptionService;
+import com.example.blog.service.EmailService;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Controller
+public class CommentController {
+
+    private final CommentService commentService;
+    private final PostService postService;
+    private final UserRepository userRepository;
+    private final SubscriptionService subscriptionService;
+    private final EmailService emailService;
+
+    @Autowired
+    public CommentController(CommentService commentService,
+                             PostService postService,
+                             UserRepository userRepository,
+                             SubscriptionService subscriptionService,
+                             EmailService emailService) {
+        this.commentService = commentService;
+        this.postService = postService;
+        this.userRepository = userRepository;
+        this.subscriptionService = subscriptionService;
+        this.emailService = emailService;
+    }
+
+    @PostMapping("/posts/{id}/comments")
+    public String addComment(@PathVariable Long id,
+                             @RequestParam String content,
+                             Authentication authentication) {
+        // 1) Find current user by email
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 2) Fetch the post
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        // 3) Create the comment
+        Comment comment = Comment.builder()
+                .content(content)
+                .createdAt(LocalDateTime.now())
+                .post(post)
+                .user(user)
+                .build();
+
+        // 4) Save the comment
+        commentService.save(comment);
+
+        // 5) Notify subscribers (except the commenter)
+        List<Subscription> subscriptions = subscriptionService.findByPost(post);
+        for (Subscription sub : subscriptions) {
+            if (!sub.getUser().getEmail().equals(user.getEmail())) {
+                // Send email notification
+                String postUrl = "http://localhost:8080/posts/" + post.getId(); // Adjust as needed
+                emailService.sendCommentNotification(
+                        sub.getUser(),
+                        post.getTitle(),
+                        postUrl
+                );
+            }
+        }
+
+        return "redirect:/posts/" + id;
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/controller/SubscriptionController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.User;
+import com.example.blog.service.PostService;
+import com.example.blog.service.SubscriptionService;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller
+@RequestMapping("/subscriptions")
+public class SubscriptionController {
+
+    private final SubscriptionService subscriptionService;
+    private final PostService postService;
+    private final UserRepository userRepository;
+
+    @Autowired
+    public SubscriptionController(SubscriptionService subscriptionService,
+                                  PostService postService,
+                                  UserRepository userRepository) {
+        this.subscriptionService = subscriptionService;
+        this.postService = postService;
+        this.userRepository = userRepository;
+    }
+
+    @PostMapping("/subscribe/{postId}")
+    public String subscribe(@PathVariable Long postId, Authentication auth, RedirectAttributes redirectAttributes) {
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id: " + postId));
+
+        subscriptionService.subscribe(user, post);
+        redirectAttributes.addFlashAttribute("success", "Subscribed to post successfully!");
+        return "redirect:/posts/" + postId;
+    }
+
+    @PostMapping("/unsubscribe/{postId}")
+    public String unsubscribe(@PathVariable Long postId, Authentication auth, RedirectAttributes redirectAttributes) {
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id: " + postId));
+
+        subscriptionService.unsubscribe(user, post);
+        redirectAttributes.addFlashAttribute("success", "Unsubscribed from post successfully!");
+        return "redirect:/posts/" + postId;
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/controller/AuthController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.User;
+import com.example.blog.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import jakarta.validation.Valid;
+
+@Controller
+public class AuthController {
+
+    private final UserService userService;
+
+    @Autowired
+    public AuthController(UserService userService){
+        this.userService = userService;
+    }
+
+    @GetMapping("/register")
+    public String showRegistrationForm(Model model){
+        model.addAttribute("user", new User());
+        return "register";
+    }
+
+    @PostMapping("/register")
+    public String registerUser(@Valid User user, BindingResult result, Model model){
+        if(result.hasErrors()){
+            return "register";
+        }
+        if(userService.findByEmail(user.getEmail()).isPresent()){
+            model.addAttribute("error", "Email already registered");
+            return "register";
+        }
+        userService.registerUser(user);
+        return "redirect:/login";
+    }
+
+    @GetMapping("/login")
+    public String showLoginForm(){
+        return "login";
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/controller/PostController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.Reaction;
+import com.example.blog.model.Tag;
+import com.example.blog.model.User;
+import com.example.blog.service.PostService;
+import com.example.blog.service.ReactionService;
+import com.example.blog.service.SubscriptionService;
+import com.example.blog.service.TagService;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Controller
+public class PostController {
+
+    private final PostService postService;
+    private final ReactionService reactionService;
+    private final TagService tagService;
+    private final UserRepository userRepository;
+    private final SubscriptionService subscriptionService;
+
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
+    @Autowired
+    public PostController(PostService postService,
+                          ReactionService reactionService,
+                          TagService tagService,
+                          UserRepository userRepository,
+                          SubscriptionService subscriptionService) {
+        this.postService = postService;
+        this.reactionService = reactionService;
+        this.tagService = tagService;
+        this.userRepository = userRepository;
+        this.subscriptionService = subscriptionService;
+    }
+
+    @GetMapping("/")
+    public String home(Model model) {
+        List<Post> posts = postService.findAll();
+        model.addAttribute("posts", posts);
+        return "home";
+    }
+
+    @GetMapping("/posts/create")
+    public String showCreatePostForm(Model model) {
+        model.addAttribute("post", new Post());
+        return "create_post";
+    }
+
+    @PostMapping("/posts/create")
+    public String createPost(@ModelAttribute Post post,
+                             @RequestParam("imageFile") MultipartFile imageFile,
+                             @RequestParam(value = "tags", required = false) String tagsInput,
+                             Authentication authentication,
+                             RedirectAttributes redirectAttributes) {
+
+        // 1) Retrieve logged-in user
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 2) Set post fields
+        post.setAuthor(user);
+        post.setCreatedAt(LocalDateTime.now());
+
+        // 3) Handle image upload
+        if (!imageFile.isEmpty()) {
+            try {
+                File uploadFolder = new File(uploadDir);
+                if (!uploadFolder.exists()) {
+                    uploadFolder.mkdirs();
+                }
+
+                String originalFilename = imageFile.getOriginalFilename();
+                String extension = "";
+                if (originalFilename != null && originalFilename.contains(".")) {
+                    extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+                }
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+                File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
+                imageFile.transferTo(destinationFile);
+
+                post.setImagePath("/uploads/" + uniqueFilename);
+            } catch (IOException e) {
+                e.printStackTrace();
+                redirectAttributes.addFlashAttribute("error", "Failed to upload image.");
+                return "redirect:/posts/create";
+            }
+        }
+
+        // 4) Parse the tags (if any)
+        if (tagsInput != null && !tagsInput.trim().isEmpty()) {
+            String[] tagNames = tagsInput.split(",");
+            Set<Tag> tagSet = new HashSet<>();
+            for (String tagName : tagNames) {
+                tagName = tagName.trim();
+                if (!tagName.isEmpty()) {
+                    Tag tag = tagService.findOrCreateTag(tagName);
+                    tagSet.add(tag);
+                }
+            }
+            post.setTags(tagSet);
+        }
+
+        // 5) Save the post
+        postService.save(post);
+        redirectAttributes.addFlashAttribute("success", "Post created successfully!");
+        return "redirect:/";
+    }
+
+    @GetMapping("/posts/{id}")
+    public String viewPost(@PathVariable Long id,
+                           Model model,
+                           @RequestParam(value = "error", required = false) String error,
+                           Authentication authentication) {
+
+        // 1) Retrieve the Post
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        // 2) Count like/dislike
+        long likeCount = reactionService.countByPostAndType(post, "LIKE");
+        long dislikeCount = reactionService.countByPostAndType(post, "DISLIKE");
+
+        // 3) Pass to the view
+        model.addAttribute("post", post);
+        model.addAttribute("comments", post.getComments());
+        model.addAttribute("likeCount", likeCount);
+        model.addAttribute("dislikeCount", dislikeCount);
+        model.addAttribute("error", error);
+
+        // 4) Check subscription status for the logged-in user
+        if (authentication != null && authentication.isAuthenticated()) {
+            String email = authentication.getName();
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user != null) {
+                boolean isSubscribed = subscriptionService.isSubscribed(user, post);
+                model.addAttribute("isSubscribed", isSubscribed);
+            }
+        }
+        return "view_post";
+    }
+
+    @PostMapping("/posts/{id}/react")
+    public String reactToPost(@PathVariable Long id,
+                              @RequestParam String type,
+                              Authentication authentication,
+                              RedirectAttributes redirectAttributes) {
+
+        // 1) Ensure user is found
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 2) Retrieve the post
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        // 3) Check existing reaction
+        Optional<Reaction> existingReaction = reactionService.findByUserAndPost(user, post);
+        if (existingReaction.isPresent()) {
+            Reaction reaction = existingReaction.get();
+            reaction.setType(type);
+            reactionService.save(reaction);
+        } else {
+            Reaction reaction = Reaction.builder()
+                    .user(user)
+                    .post(post)
+                    .type(type)
+                    .build();
+            reactionService.save(reaction);
+        }
+
+        return "redirect:/posts/" + id;
+    }
+
+    @GetMapping("/posts/{id}/edit")
+    public String showEditPostForm(@PathVariable Long id,
+                                   Model model,
+                                   Authentication authentication,
+                                   RedirectAttributes redirectAttributes) {
+
+        // 1) Retrieve the post
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        // 2) Check ownership
+        String email = authentication.getName();
+        if (!post.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        // 3) Pass to the model
+        model.addAttribute("post", post);
+        return "edit_post";
+    }
+
+    @PostMapping("/posts/{id}/edit")
+    public String editPost(@PathVariable Long id,
+                           @ModelAttribute Post updatedPost,
+                           @RequestParam("imageFile") MultipartFile imageFile,
+                           @RequestParam(value = "tags", required = false) String tagsInput,
+                           Authentication authentication,
+                           RedirectAttributes redirectAttributes) {
+
+        // 1) Retrieve existing post
+        Post existingPost = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        // 2) Check ownership
+        String email = authentication.getName();
+        if (!existingPost.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        // 3) Update fields
+        existingPost.setTitle(updatedPost.getTitle());
+        existingPost.setContent(updatedPost.getContent());
+
+        // 4) Handle image upload
+        if (imageFile != null && !imageFile.isEmpty()) {
+            try {
+                File uploadFolder = new File(uploadDir);
+                if (!uploadFolder.exists()) {
+                    uploadFolder.mkdirs();
+                }
+
+                String originalFilename = imageFile.getOriginalFilename();
+                String extension = "";
+                if (originalFilename != null && originalFilename.contains(".")) {
+                    extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+                }
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+                File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
+                imageFile.transferTo(destinationFile);
+
+                // If there was an old image, try to delete it
+                if (existingPost.getImagePath() != null) {
+                    String oldImageName = existingPost.getImagePath().replace("/uploads/", "");
+                    File oldImage = new File(uploadDir, oldImageName);
+                    if (oldImage.exists()) {
+                        oldImage.delete();
+                    }
+                }
+
+                // Set new image path
+                existingPost.setImagePath("/uploads/" + uniqueFilename);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                redirectAttributes.addFlashAttribute("error", "Failed to upload new image.");
+                return "redirect:/posts/" + id + "/edit";
+            }
+        }
+
+        // 5) Handle Tags (if any)
+        if (tagsInput != null && !tagsInput.trim().isEmpty()) {
+            String[] tagNames = tagsInput.split(",");
+            Set<Tag> tagSet = new HashSet<>();
+            for (String tagName : tagNames) {
+                tagName = tagName.trim();
+                if (!tagName.isEmpty()) {
+                    Tag tag = tagService.findOrCreateTag(tagName);
+                    tagSet.add(tag);
+                }
+            }
+            existingPost.setTags(tagSet);
+        } else {
+            // If user leaves tag field blank, clear all tags
+            existingPost.setTags(new HashSet<>());
+        }
+
+        // 6) Save
+        try {
+            postService.save(existingPost);
+            redirectAttributes.addFlashAttribute("success", "Post updated successfully!");
+        } catch (Exception e) {
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("error", "An error occurred while updating the post.");
+        }
+
+        return "redirect:/posts/" + id;
+    }
+
+    /*
+     * REMOVED the partial subscribe endpoint from here, because
+     * the SubscriptionController handles that properly.
+     *
+     * The "Subscribe" / "Unsubscribe" form in view_post.html
+     * posts to "/subscriptions/subscribe/{postId}" or
+     * "/subscriptions/unsubscribe/{postId}" respectively.
+     */
+
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/TagService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Tag;
+import com.example.blog.repository.TagRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class TagService {
+
+    private final TagRepository tagRepository;
+
+    @Autowired
+    public TagService(TagRepository tagRepository) {
+        this.tagRepository = tagRepository;
+    }
+
+    // Existing method to create/find a tag by name
+    public Tag findOrCreateTag(String name) {
+        return tagRepository.findByName(name)
+                .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
+    }
+
+    // Existing method to save a Tag entity
+    public Tag save(Tag tag) {
+        return tagRepository.save(tag);
+    }
+
+    // Newly added: find all tags
+    public List<Tag> findAll() {
+        return tagRepository.findAll();
+    }
+
+    // Newly added: find tag by ID
+    public Optional<Tag> findById(Long id) {
+        return tagRepository.findById(id);
+    }
+
+    // Existing method to find tag by name
+    public Optional<Tag> findByName(String name){
+        return tagRepository.findByName(name);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/UserService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.User;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Autowired
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder){
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    public User registerUser(User user){
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        return userRepository.save(user);
+    }
+
+    public Optional<User> findByEmail(String email){
+        return userRepository.findByEmail(email);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/CommentService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Comment;
+import com.example.blog.repository.CommentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Service
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+
+    @Autowired
+    public CommentService(CommentRepository commentRepository){
+        this.commentRepository = commentRepository;
+    }
+
+    @Transactional
+    public Comment save(Comment comment){
+        return commentRepository.save(comment);
+    }
+
+    public Optional<Comment> findById(Long id){
+        return commentRepository.findById(id);
+    }
+
+    public void deleteById(Long id){
+        commentRepository.deleteById(id);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/SubscriptionService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Subscription;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import com.example.blog.repository.SubscriptionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class SubscriptionService {
+
+    private final SubscriptionRepository subscriptionRepository;
+
+    @Autowired
+    public SubscriptionService(SubscriptionRepository subscriptionRepository) {
+        this.subscriptionRepository = subscriptionRepository;
+    }
+
+    public Subscription subscribe(User user, Post post) {
+        Optional<Subscription> existing = subscriptionRepository.findByUserAndPost(user, post);
+        if (existing.isPresent()) {
+            // Already subscribed, so just return it
+            return existing.get();
+        }
+        // Otherwise create a new one
+        Subscription subscription = Subscription.builder()
+                .user(user)
+                .post(post)
+                .build();
+        return subscriptionRepository.save(subscription);
+    }
+
+    public void unsubscribe(User user, Post post) {
+        subscriptionRepository.findByUserAndPost(user, post)
+                .ifPresent(subscriptionRepository::delete);
+    }
+
+    public List<Subscription> findByPost(Post post) {
+        return subscriptionRepository.findByPost(post);
+    }
+
+    public boolean isSubscribed(User user, Post post) {
+        return subscriptionRepository.findByUserAndPost(user, post).isPresent();
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/ReactionService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Reaction;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import com.example.blog.repository.ReactionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class ReactionService {
+
+    private final ReactionRepository reactionRepository;
+
+    @Autowired
+    public ReactionService(ReactionRepository reactionRepository){
+        this.reactionRepository = reactionRepository;
+    }
+
+    public Optional<Reaction> findByUserAndPost(User user, Post post){
+        return reactionRepository.findByUserAndPost(user, post);
+    }
+
+    public Reaction save(Reaction reaction){
+        return reactionRepository.save(reaction);
+    }
+
+    // Count how many likes or dislikes a post has
+    public long countByPostAndType(Post post, String type) {
+        return reactionRepository.countByPostAndType(post, type);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/PostService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Post;
+import com.example.blog.repository.PostRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class PostService {
+
+    private final PostRepository postRepository;
+
+    @Autowired
+    public PostService(PostRepository postRepository){
+        this.postRepository = postRepository;
+    }
+
+    public List<Post> findAll(){
+        return postRepository.findAll();
+    }
+
+    public Optional<Post> findById(Long id){
+        return postRepository.findById(id);
+    }
+
+    public Post save(Post post){
+        return postRepository.save(post);
+    }
+
+    public void deleteById(Long id){
+        postRepository.deleteById(id);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/EmailService.java -----
+package com.example.blog.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+import com.example.blog.model.User;
+
+@Service
+public class EmailService {
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    public void sendCommentNotification(User toUser, String postTitle, String postUrl) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(toUser.getEmail());
+        message.setSubject("New Comment on Your Subscribed Post: " + postTitle);
+        message.setText("Hello " + toUser.getName() + ",\n\n" +
+                "A new comment has been added to the post \"" + postTitle + "\".\n" +
+                "You can view the comment here: " + postUrl + "\n\n" +
+                "Best regards,\nBlogio Team");
+        mailSender.send(message);
+    }
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/Post.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.Set;
+
+@Entity
+@Table(name = "posts")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Post {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    private LocalDateTime createdAt;
+
+    private String imagePath;
+
+    // Relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id")
+    private User author;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Comment> comments;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Reaction> reactions;
+
+    // New Many-to-Many for Tags
+    @ManyToMany
+    @JoinTable(
+            name = "post_tags",
+            joinColumns = @JoinColumn(name = "post_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/Comment.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "comments")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Comment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    private LocalDateTime createdAt;
+
+    // Relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/Reaction.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "reactions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Reaction {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String type; // e.g., "LIKE", "DISLIKE"
+
+    // Relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/Tag.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.Set;
+
+@Entity
+@Table(name = "tags")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Tag {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    // A tag can belong to many posts, and a post can have many tags
+    @ManyToMany(mappedBy = "tags")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Post> posts;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/Subscription.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "subscriptions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Subscription {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // The user who subscribes
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    // The post the user subscribes to
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    private Post post;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/model/User.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    private String name;
+
+    // Relationships
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Post> posts;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Comment> comments;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Reaction> reactions;
+}
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/register.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Register</title>
+    <!-- Load the Morph theme and your custom styles -->
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
+    <!-- You can wrap your card in a .neumorphic-card or just rely on card + shadow -->
+    <div class="neumorphic-card" style="min-width: 300px;">
+        <h2 class="text-center mb-4">Register</h2>
+
+        <!-- Flash Messages -->
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+        <form th:action="@{/register}" th:object="${user}" method="post" class="mt-3">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" th:field="*{email}" class="form-control neumorphic-input" id="email" required/>
+            </div>
+            <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <input type="text" th:field="*{name}" class="form-control neumorphic-input" id="name" required/>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" th:field="*{password}" class="form-control neumorphic-input" id="password" required/>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 neumorphic-button">Register</button>
+            <a href="/login" class="btn btn-link mt-2">Login</a>
+        </form>
+    </div>
+</div>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/view_post.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${post.title}">Post Title</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/posts/create">
+                        <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags"><i class="fas fa-tag"></i> All Tags</a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <div class="neumorphic-card">
+        <h2 class="view-post-title" th:text="${post.title}">Post Title</h2>
+        <p class="view-post-meta">
+            By <strong th:text="${post.author.name}">Author</strong>
+            &bull;
+            <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
+        </p>
+        <hr/>
+
+        <div th:if="${post.imagePath != null}" class="mb-4 text-center">
+            <img th:src="${post.imagePath}" alt="Post Image" class="post-image-full" style="max-width: 100%; border-radius: 20px;"/>
+        </div>
+
+        <p class="view-post-content" th:text="${post.content}">Post Content</p>
+
+        <!-- Display tags (if any) -->
+        <div class="mt-3" th:if="${not #lists.isEmpty(post.tags)}">
+            <h5>Tags:</h5>
+            <div>
+                <span th:each="tag : ${post.tags}" class="badge bg-info me-1" th:text="${tag.name}">Tag</span>
+            </div>
+        </div>
+
+        <div th:if="${#authentication.principal.username == post.author.email}" class="mt-4">
+            <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
+                <i class="fas fa-edit"></i> Edit Post
+            </a>
+        </div>
+
+        <hr/>
+
+        <!-- Like/Dislike Reactions -->
+        <div class="mb-4">
+            <form th:action="@{'/posts/' + ${post.id} + '/react'}" method="post" class="d-inline">
+                <input type="hidden" name="type" value="LIKE"/>
+                <button type="submit" class="btn btn-success me-2 neumorphic-button">
+                    <i class="fas fa-thumbs-up"></i> Like
+                </button>
+            </form>
+            <form th:action="@{'/posts/' + ${post.id} + '/react'}" method="post" class="d-inline">
+                <input type="hidden" name="type" value="DISLIKE"/>
+                <button type="submit" class="btn btn-danger neumorphic-button">
+                    <i class="fas fa-thumbs-down"></i> Dislike
+                </button>
+            </form>
+
+            <div class="mt-3">
+                <span class="badge bg-success me-1">Likes:
+                    <span th:text="${likeCount}">0</span>
+                </span>
+                <span class="badge bg-danger">Dislikes:
+                    <span th:text="${dislikeCount}">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Subscribe / Unsubscribe buttons -->
+        <div class="mb-4" th:if="${#authentication.principal != null}">
+            <form th:action="@{'/subscriptions/' + (${isSubscribed} ? 'unsubscribe/' + ${post.id} : 'subscribe/' + ${post.id})}"
+                  method="post">
+                <button type="submit" class="btn neumorphic-button"
+                        th:classappend="${isSubscribed} ? 'btn-danger' : 'btn-info'">
+                    <i th:class="${isSubscribed} ? 'fas fa-bell-slash' : 'fas fa-bell'"></i>
+                    <span th:text="${isSubscribed} ? 'Unsubscribe' : 'Subscribe'">Subscribe</span>
+                </button>
+            </form>
+        </div>
+
+        <hr/>
+
+        <!-- Comments Section -->
+        <h4>Comments (<span th:text="${#lists.size(comments)}">0</span>)</h4>
+        <div th:if="${#lists.isEmpty(comments)}">
+            <p>No comments yet. Be the first to comment!</p>
+        </div>
+        <div th:each="comment : ${comments}" class="comment-card">
+            <p class="comment-content" th:text="${comment.content}">Comment content...</p>
+            <p class="comment-author mb-0" th:text="${comment.user.name}">User</p>
+            <p class="comment-date text-muted" th:text="${#temporals.format(comment.createdAt, 'dd MMM yyyy HH:mm')}">Date</p>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Add a Comment</h5>
+                <form th:action="@{'/posts/' + ${post.id} + '/comments'}" method="post">
+                    <div class="mb-3">
+                        <textarea name="content" class="form-control neumorphic-input" rows="3" placeholder="Your comment here..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary neumorphic-button">Submit Comment</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/tags_list.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>All Tags</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="/css/styles.css" rel="stylesheet"/>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/">Blogio</a>
+    <button class="navbar-toggler" type="button"
+            data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false"
+            aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ms-auto me-4">
+        <!-- Link to create post (if user is logged in) -->
+        <li class="nav-item" th:if="${#authentication.principal != null}">
+          <a class="nav-link" href="/posts/create">
+            <i class="fas fa-pen"></i> Create Post
+          </a>
+        </li>
+        <!-- Logout (if logged in) -->
+        <li class="nav-item" th:if="${#authentication.principal != null}">
+          <form th:action="@{/logout}" method="post" class="d-inline">
+            <button type="submit" class="btn btn-link nav-link">
+              <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+          </form>
+        </li>
+        <!-- Login/Register (if not logged in) -->
+        <li class="nav-item" th:if="${#authentication.principal == null}">
+          <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Login</a>
+        </li>
+        <li class="nav-item" th:if="${#authentication.principal == null}">
+          <a class="nav-link" href="/register"><i class="fas fa-user-plus"></i> Register</a>
+        </li>
+        <!-- Link to All Tags (current page) -->
+        <li class="nav-item">
+          <a class="nav-link active" href="/tags">
+            <i class="fas fa-tag"></i> All Tags
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <h2 class="mb-4">All Tags</h2>
+
+  <div class="row" th:if="${#lists.isEmpty(tags)}">
+    <div class="col-12">
+      <div class="alert alert-warning">No tags found.</div>
+    </div>
+  </div>
+
+  <div class="row" th:each="tag : ${tags}">
+    <div class="col-md-3 mb-3">
+      <a th:href="@{'/tags/' + ${tag.id}}" class="btn btn-info neumorphic-button w-100">
+        <i class="fas fa-tag"></i>
+        <span th:text="${tag.name}">Tag Name</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer class="footer text-center py-3">
+  <div class="container">
+    <span>&copy; 2025 Blogio. All rights reserved.</span>
+  </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/access-denied.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Access Denied</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/posts/create">Create Post</a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">Logout</button>
+                    </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">Login</a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">Register</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-5">
+    <div class="neumorphic-card text-center">
+        <h1 class="display-4 text-danger">Access Denied</h1>
+        <p class="lead">You do not have permission to access this page.</p>
+        <a href="/" class="btn btn-primary mt-3 neumorphic-button">Go to Home</a>
+    </div>
+</div>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/create_post.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create Post</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Home</a>
+                </li>
+                <!-- Link to All Tags -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+                <!-- if user is not logged in, show login/register (optional) -->
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <div class="neumorphic-card">
+        <h2 class="mb-4">Create New Post</h2>
+        <form th:action="@{/posts/create}" th:object="${post}" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" th:field="*{title}" class="form-control neumorphic-input"
+                       id="title" placeholder="Enter post title" required/>
+            </div>
+
+            <div class="mb-3">
+                <label for="content" class="form-label">Content</label>
+                <textarea th:field="*{content}" class="form-control neumorphic-input"
+                          id="content" rows="7" placeholder="Write your post here..." required></textarea>
+            </div>
+
+            <!-- Plain text input for tags (comma-separated) -->
+            <div class="mb-3">
+                <label for="tagsInput" class="form-label">Tags (comma-separated)</label>
+                <input type="text" class="form-control neumorphic-input" id="tagsInput" name="tags"
+                       placeholder="e.g. Java, Spring, Boot" />
+            </div>
+
+            <div class="mb-3">
+                <label for="imageFile" class="form-label">Image (Optional)</label>
+                <input type="file" class="form-control neumorphic-input" id="imageFile" name="imageFile"
+                       accept="image/*" />
+                <div class="form-text">Supported formats: JPG, PNG, GIF. Max size: 5MB.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary neumorphic-button">
+                <i class="fas fa-paper-plane"></i> Publish
+            </button>
+            <a href="/" class="btn btn-secondary ms-2 neumorphic-button">Cancel</a>
+        </form>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/tag_posts.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Posts for Tag</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <!-- Link to create post (if user is logged in) -->
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/posts/create">
+                        <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <!-- Logout (if logged in) -->
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+                <!-- Login/Register (if not logged in) -->
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Login</a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register"><i class="fas fa-user-plus"></i> Register</a>
+                </li>
+                <!-- Link to All Tags -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <h2 class="mb-4">
+        Posts for Tag: <span th:text="${tag.name}">Tag Name</span>
+    </h2>
+
+    <div th:if="${#lists.isEmpty(posts)}">
+        <p>No posts found for this tag.</p>
+    </div>
+
+    <div th:each="post : ${posts}" class="post-card">
+        <div class="post-content">
+            <h5 class="post-title" th:text="${post.title}">Post Title</h5>
+            <p class="text-muted">
+                By <strong th:text="${post.author.name}">Author</strong>
+                &bull;
+                <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
+            </p>
+            <p class="post-excerpt" th:text="${#strings.abbreviate(post.content, 150)}">Excerpt...</p>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
+                <i class="fas fa-book-open"></i> Read More
+            </a>
+        </div>
+        <div>
+            <img th:if="${post.imagePath != null}" th:src="${post.imagePath}" alt="Post Image" class="post-image"/>
+        </div>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/home.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Home</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/posts/create">
+                        <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <h2 class="mb-4">All Posts</h2>
+
+    <div th:if="${#lists.isEmpty(posts)}">
+        <p>No posts yet. Be the first to create one!</p>
+    </div>
+
+    <!-- Each post displayed in a neumorphic post-card -->
+    <div th:each="post : ${posts}" class="post-card">
+        <div class="post-content">
+            <h5 class="post-title" th:text="${post.title}">Post Title</h5>
+            <p class="text-muted">
+                By <strong th:text="${post.author.name}">Author</strong>
+                &bull;
+                <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
+            </p>
+            <p class="post-excerpt" th:text="${#strings.abbreviate(post.content, 150)}">Excerpt...</p>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
+                <i class="fas fa-book-open"></i> Read More
+            </a>
+        </div>
+        <div>
+            <img th:if="${post.imagePath != null}" th:src="${post.imagePath}" alt="Post Image" class="post-image"/>
+        </div>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/login.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Login</title>
+    <!-- Morph + custom styles -->
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
+    <div class="neumorphic-card" style="min-width: 300px;">
+        <h2 class="text-center mb-4">Login</h2>
+
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+        <form th:action="@{/login}" method="post" class="mt-3">
+            <div class="mb-3">
+                <label for="username" class="form-label">Email</label>
+                <input type="text" class="form-control neumorphic-input" id="username" name="username" required/>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control neumorphic-input" id="password" name="password" required/>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 neumorphic-button">Login</button>
+            <a href="/register" class="btn btn-link mt-2">Register</a>
+        </form>
+    </div>
+</div>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/resources/templates/edit_post.html -----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Post</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Home</a>
+                </li>
+                <!-- Link to All Tags -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <div class="neumorphic-card">
+        <h2>Edit Post</h2>
+        <form th:action="@{'/posts/' + ${post.id} + '/edit'}" th:object="${post}" method="post"
+              enctype="multipart/form-data" class="mt-3">
+
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" th:field="*{title}" class="form-control neumorphic-input"
+                       id="title" placeholder="Update post title" required/>
+            </div>
+
+            <div class="mb-3">
+                <label for="content" class="form-label">Content</label>
+                <textarea th:field="*{content}" class="form-control neumorphic-input" id="content"
+                          rows="7" placeholder="Update your post here..." required></textarea>
+            </div>
+
+            <!-- Plain text input for tags (comma-separated) -->
+            <div class="mb-3">
+                <label for="tagsInput" class="form-label">Tags (comma-separated)</label>
+                <input type="text" class="form-control neumorphic-input" id="tagsInput" name="tags"
+                       placeholder="e.g. Java, Spring, Boot"/>
+                <div class="form-text">
+                    If you leave this blank, the existing tags will be cleared.
+                    Provide comma-separated tags to update them.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Current Image</label>
+                <div th:if="${post.imagePath != null}" class="mb-3">
+                    <img th:src="${post.imagePath}" alt="Current Image" class="img-fluid post-image-full"/>
+                </div>
+                <label for="imageFile" class="form-label">Change Image (Optional)</label>
+                <input type="file" class="form-control neumorphic-input" id="imageFile" name="imageFile"
+                       accept="image/*"/>
+                <div class="form-text">Uploading a new image will replace the current one.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary neumorphic-button">
+                <i class="fas fa-paper-plane"></i> Update
+            </button>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-secondary ms-2 neumorphic-button">Cancel</a>
+        </form>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
