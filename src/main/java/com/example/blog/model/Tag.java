@@ -27,6 +27,7 @@ public class Tag {
     // Many-to-Many with Posts
     @ManyToMany(mappedBy = "tags")
     @ToString.Exclude
+    @Builder.Default
     private Set<Post> posts = new HashSet<>();
 
     // Helper Methods
