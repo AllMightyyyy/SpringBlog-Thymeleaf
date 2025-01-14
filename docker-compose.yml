@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - upload_data:/app/uploads
+    networks:
+      - blog-network
+
+  db:
+    image: mysql:8
+    container_name: mysql-blog-db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: blogPost_db
+      MYSQL_ROOT_PASSWORD: zakaria
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  blog-network:
+
+volumes:
+  db_data:
+  upload_data:

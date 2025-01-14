@@ -7,7 +7,6 @@ import com.example.blog.model.User;
 import com.example.blog.service.CommentService;
 import com.example.blog.service.PostService;
 import com.example.blog.service.SubscriptionService;
-import com.example.blog.service.EmailService;
 import com.example.blog.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -26,19 +25,16 @@ public class CommentController {
     private final PostService postService;
     private final UserRepository userRepository;
     private final SubscriptionService subscriptionService;
-    private final EmailService emailService;
 
     @Autowired
     public CommentController(CommentService commentService,
                              PostService postService,
                              UserRepository userRepository,
-                             SubscriptionService subscriptionService,
-                             EmailService emailService) {
+                             SubscriptionService subscriptionService) {
         this.commentService = commentService;
         this.postService = postService;
         this.userRepository = userRepository;
         this.subscriptionService = subscriptionService;
-        this.emailService = emailService;
     }
 
     @PostMapping("/posts/{id}/comments")
@@ -68,20 +64,6 @@ public class CommentController {
 
         // 5) Save the post (cascades to comment)
         postService.save(post);
-
-        // 6) Notify subscribers (except the commenter)
-        List<Subscription> subscriptions = subscriptionService.findByPost(post);
-        for (Subscription sub : subscriptions) {
-            if (!sub.getUser().getEmail().equals(user.getEmail())) {
-                // Send email notification
-                String postUrl = "http://localhost:8080/posts/" + post.getId(); // Adjust as needed
-                emailService.sendCommentNotification(
-                        sub.getUser(),
-                        post.getTitle(),
-                        postUrl
-                );
-            }
-        }
 
         redirectAttributes.addFlashAttribute("success", "Comment added successfully!");
         return "redirect:/posts/" + id;
