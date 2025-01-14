@@ -162,6 +162,7 @@ import java.util.Optional;
 public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
     Optional<Subscription> findByUserAndPost(User user, Post post);
     List<Subscription> findByPost(Post post);
+    void deleteByPost(Post post);
 }
 
 
@@ -496,7 +497,7 @@ public class PostController {
                 imageFile.delete();
             }
         }
-        postService.deleteById(id);
+        postService.deleteById(id); // Cascade deletes Subscriptions
         redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
         return "redirect:/my-posts";
     }
@@ -1040,6 +1041,10 @@ public class Post {
     @ToString.Exclude
     private Set<Reaction> reactions = new HashSet<>();
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Subscription> subscriptions = new HashSet<>();
+
     @ManyToMany
     @JoinTable(
             name = "post_tags",
@@ -1068,6 +1073,16 @@ public class Post {
     public void removeTag(Tag tag) {
         tags.remove(tag);
         tag.getPosts().remove(this);
+    }
+
+    public void addSubscription(Subscription subscription) {
+        subscriptions.add(subscription);
+        subscription.setPost(this);
+    }
+
+    public void removeSubscription(Subscription subscription) {
+        subscriptions.remove(subscription);
+        subscription.setPost(null);
     }
 }
 

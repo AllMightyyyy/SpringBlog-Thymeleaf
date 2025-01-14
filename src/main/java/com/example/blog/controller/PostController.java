@@ -1,9 +1,6 @@
 package com.example.blog.controller;
 
-import com.example.blog.model.Post;
-import com.example.blog.model.Reaction;
-import com.example.blog.model.Tag;
-import com.example.blog.model.User;
+import com.example.blog.model.*;
 import com.example.blog.service.PostService;
 import com.example.blog.service.ReactionService;
 import com.example.blog.service.SubscriptionService;
@@ -84,6 +81,11 @@ public class PostController {
                 imageFile.delete();
             }
         }
+
+        for (Subscription sub : new HashSet<>(post.getSubscriptions())) {
+            post.removeSubscription(sub);
+        }
+
         postService.deleteById(id); // Cascade deletes Subscriptions
         redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
         return "redirect:/my-posts";
