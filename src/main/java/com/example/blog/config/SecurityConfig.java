@@ -21,8 +21,8 @@ public class SecurityConfig {
     private UserRepository userRepository;
 
     @Bean
-    public UserDetailsService userDetailsService(){
-        return new UserDetailsService(){
+    public UserDetailsService userDetailsService() {
+        return new UserDetailsService() {
             @Override
             public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
                 com.example.blog.model.User user = userRepository.findByEmail(email)
@@ -37,7 +37,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
@@ -45,7 +45,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/register", "/login", "/css/**", "/uploads/**", "/**/*.map").permitAll()
+                        .requestMatchers("/register", "/login", "/css/**", "/uploads/**", "/*.map").permitAll()
                         .requestMatchers("/posts/create", "/posts/*/edit").authenticated()
                         .anyRequest().authenticated()
                 )
