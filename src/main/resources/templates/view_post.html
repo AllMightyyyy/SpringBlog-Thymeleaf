@@ -67,9 +67,8 @@
             <img th:src="${post.imagePath}" alt="Post Image" class="post-image-full" style="max-width: 100%; border-radius: 20px;"/>
         </div>
 
-        <p class="view-post-content" th:text="${post.content}">Post Content</p>
+        <div class="view-post-content" th:utext="${post.content}">Post Content</div>
 
-        <!-- Display tags (if any) -->
         <div class="mt-3" th:if="${not #lists.isEmpty(post.tags)}">
             <h5>Tags:</h5>
             <div>
@@ -87,7 +86,6 @@
 
         <hr/>
 
-        <!-- Like/Dislike Reactions -->
         <div class="mb-4">
             <form th:action="@{'/posts/' + ${post.id} + '/react'}" method="post" class="d-inline">
                 <input type="hidden" name="type" value="LIKE"/>
@@ -112,7 +110,6 @@
             </div>
         </div>
 
-        <!-- Subscribe / Unsubscribe buttons -->
         <div class="mb-4" th:if="${#authentication.principal != null}">
             <form th:action="@{'/subscriptions/unsubscribe/' + ${post.id}}" th:if="${isSubscribed}" method="post">
                 <button type="submit" class="btn btn-danger neumorphic-button">
@@ -130,7 +127,6 @@
 
         <hr/>
 
-        <!-- Comments Section -->
         <h4>Comments (<span th:text="${#lists.size(comments)}">0</span>)</h4>
         <div th:if="${#lists.isEmpty(comments)}">
             <p>No comments yet. Be the first to comment!</p>

@@ -62,7 +62,6 @@
         <p>No posts yet. Be the first to create one!</p>
     </div>
 
-    <!-- Each post displayed in a neumorphic post-card -->
     <div th:each="post : ${posts}" class="post-card">
         <div class="post-content">
             <h5 class="post-title" th:text="${post.title}">Post Title</h5>
@@ -71,7 +70,7 @@
                 &bull;
                 <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
             </p>
-            <p class="post-excerpt" th:text="${#strings.abbreviate(post.content, 150)}">Excerpt...</p>
+            <div class="post-excerpt" th:utext="${#strings.abbreviate(post.content, 150)}"></div>
             <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
                 <i class="fas fa-book-open"></i> Read More
             </a>

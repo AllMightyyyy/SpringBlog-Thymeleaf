@@ -2,7 +2,6 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Register</title>
-    <!-- Load the Morph theme and your custom styles -->
     <link href="/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="/css/styles.css" rel="stylesheet"/>
 
@@ -11,11 +10,9 @@
 <body class="bg-light">
 
 <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
-    <!-- You can wrap your card in a .neumorphic-card or just rely on card + shadow -->
     <div class="neumorphic-card" style="min-width: 300px;">
         <h2 class="text-center mb-4">Register</h2>
 
-        <!-- Flash Messages -->
         <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
         <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
 
