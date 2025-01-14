@@ -1,37 +1,3 @@
------ /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/config/MailConfig.java -----
-package com.example.blog.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-
-import java.util.Properties;
-
-@Configuration
-@EnableConfigurationProperties
-public class MailConfig {
-
-    @Bean
-    public JavaMailSender javaMailSender() {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-
-        mailSender.setHost("your_smtp_server");
-        mailSender.setPort(587);
-        mailSender.setUsername("your_email");
-        mailSender.setPassword("your_password");
-
-        Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-
-        return mailSender;
-    }
-}
-
-
 ----- /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/config/WebConfig.java -----
 package com.example.blog.config;
 
@@ -62,7 +28,6 @@ import com.example.blog.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-// Import other necessary packages
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -226,6 +191,7 @@ import com.example.blog.service.TagService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @Controller
@@ -247,6 +213,7 @@ public class TagController {
 
     // Display all posts belonging to a specific tag
     @GetMapping("/tags/{id}")
+    @Transactional
     public String showPostsByTag(@PathVariable Long id, Model model) {
         Tag tag = tagService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid tag ID: " + id));
@@ -268,13 +235,14 @@ import com.example.blog.model.User;
 import com.example.blog.service.CommentService;
 import com.example.blog.service.PostService;
 import com.example.blog.service.SubscriptionService;
-import com.example.blog.service.EmailService;
 import com.example.blog.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -285,25 +253,24 @@ public class CommentController {
     private final PostService postService;
     private final UserRepository userRepository;
     private final SubscriptionService subscriptionService;
-    private final EmailService emailService;
 
     @Autowired
     public CommentController(CommentService commentService,
                              PostService postService,
                              UserRepository userRepository,
-                             SubscriptionService subscriptionService,
-                             EmailService emailService) {
+                             SubscriptionService subscriptionService) {
         this.commentService = commentService;
         this.postService = postService;
         this.userRepository = userRepository;
         this.subscriptionService = subscriptionService;
-        this.emailService = emailService;
     }
 
     @PostMapping("/posts/{id}/comments")
+    @Transactional
     public String addComment(@PathVariable Long id,
                              @RequestParam String content,
-                             Authentication authentication) {
+                             Authentication authentication,
+                             RedirectAttributes redirectAttributes) {
         // 1) Find current user by email
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
@@ -317,27 +284,16 @@ public class CommentController {
         Comment comment = Comment.builder()
                 .content(content)
                 .createdAt(LocalDateTime.now())
-                .post(post)
                 .user(user)
                 .build();
 
-        // 4) Save the comment
-        commentService.save(comment);
+        // 4) Associate comment with post using helper method
+        post.addComment(comment);
 
-        // 5) Notify subscribers (except the commenter)
-        List<Subscription> subscriptions = subscriptionService.findByPost(post);
-        for (Subscription sub : subscriptions) {
-            if (!sub.getUser().getEmail().equals(user.getEmail())) {
-                // Send email notification
-                String postUrl = "http://localhost:8080/posts/" + post.getId(); // Adjust as needed
-                emailService.sendCommentNotification(
-                        sub.getUser(),
-                        post.getTitle(),
-                        postUrl
-                );
-            }
-        }
+        // 5) Save the post (cascades to comment)
+        postService.save(post);
 
+        redirectAttributes.addFlashAttribute("success", "Comment added successfully!");
         return "redirect:/posts/" + id;
     }
 }
@@ -411,10 +367,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class AuthController {
@@ -433,7 +389,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public String registerUser(@Valid User user, BindingResult result, Model model){
+    public String registerUser(@Valid @ModelAttribute("user") User user, BindingResult result, Model model, RedirectAttributes redirectAttributes){
         if(result.hasErrors()){
             return "register";
         }
@@ -442,6 +398,7 @@ public class AuthController {
             return "register";
         }
         userService.registerUser(user);
+        redirectAttributes.addFlashAttribute("success", "Registration successful! Please login.");
         return "redirect:/login";
     }
 
@@ -473,6 +430,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.transaction.Transactional;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -518,6 +476,7 @@ public class PostController {
     }
 
     @PostMapping("/posts/create")
+    @Transactional
     public String createPost(@ModelAttribute Post post,
                              @RequestParam("imageFile") MultipartFile imageFile,
                              @RequestParam(value = "tags", required = false) String tagsInput,
@@ -568,6 +527,7 @@ public class PostController {
                 if (!tagName.isEmpty()) {
                     Tag tag = tagService.findOrCreateTag(tagName);
                     tagSet.add(tag);
+                    post.addTag(tag);
                 }
             }
             post.setTags(tagSet);
@@ -580,6 +540,7 @@ public class PostController {
     }
 
     @GetMapping("/posts/{id}")
+    @Transactional
     public String viewPost(@PathVariable Long id,
                            Model model,
                            @RequestParam(value = "error", required = false) String error,
@@ -613,6 +574,7 @@ public class PostController {
     }
 
     @PostMapping("/posts/{id}/react")
+    @Transactional
     public String reactToPost(@PathVariable Long id,
                               @RequestParam String type,
                               Authentication authentication,
@@ -642,10 +604,12 @@ public class PostController {
             reactionService.save(reaction);
         }
 
+        redirectAttributes.addFlashAttribute("success", "Your reaction has been recorded.");
         return "redirect:/posts/" + id;
     }
 
     @GetMapping("/posts/{id}/edit")
+    @Transactional
     public String showEditPostForm(@PathVariable Long id,
                                    Model model,
                                    Authentication authentication,
@@ -664,10 +628,17 @@ public class PostController {
 
         // 3) Pass to the model
         model.addAttribute("post", post);
+
+        // Prepare tags as comma-separated string
+        String tags = String.join(", ",
+                post.getTags().stream().map(Tag::getName).toArray(String[]::new));
+        model.addAttribute("tagsInput", tags);
+
         return "edit_post";
     }
 
     @PostMapping("/posts/{id}/edit")
+    @Transactional
     public String editPost(@PathVariable Long id,
                            @ModelAttribute Post updatedPost,
                            @RequestParam("imageFile") MultipartFile imageFile,
@@ -730,18 +701,31 @@ public class PostController {
         // 5) Handle Tags (if any)
         if (tagsInput != null && !tagsInput.trim().isEmpty()) {
             String[] tagNames = tagsInput.split(",");
-            Set<Tag> tagSet = new HashSet<>();
+            Set<Tag> newTagSet = new HashSet<>();
             for (String tagName : tagNames) {
                 tagName = tagName.trim();
                 if (!tagName.isEmpty()) {
                     Tag tag = tagService.findOrCreateTag(tagName);
-                    tagSet.add(tag);
+                    newTagSet.add(tag);
                 }
             }
-            existingPost.setTags(tagSet);
+
+            // Remove existing tags not in newTagSet
+            Set<Tag> tagsToRemove = new HashSet<>(existingPost.getTags());
+            tagsToRemove.removeAll(newTagSet);
+            for (Tag tag : tagsToRemove) {
+                existingPost.removeTag(tag);
+            }
+
+            // Add new tags
+            for (Tag tag : newTagSet) {
+                existingPost.addTag(tag);
+            }
         } else {
             // If user leaves tag field blank, clear all tags
-            existingPost.setTags(new HashSet<>());
+            for (Tag tag : new HashSet<>(existingPost.getTags())) {
+                existingPost.removeTag(tag);
+            }
         }
 
         // 6) Save
@@ -755,16 +739,6 @@ public class PostController {
 
         return "redirect:/posts/" + id;
     }
-
-    /*
-     * REMOVED the partial subscribe endpoint from here, because
-     * the SubscriptionController handles that properly.
-     *
-     * The "Subscribe" / "Unsubscribe" form in view_post.html
-     * posts to "/subscriptions/subscribe/{postId}" or
-     * "/subscriptions/unsubscribe/{postId}" respectively.
-     */
-
 }
 
 
@@ -789,28 +763,28 @@ public class TagService {
         this.tagRepository = tagRepository;
     }
 
-    // Existing method to create/find a tag by name
+    // Create or find a tag by name
     public Tag findOrCreateTag(String name) {
         return tagRepository.findByName(name)
                 .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
     }
 
-    // Existing method to save a Tag entity
+    // Save a Tag entity
     public Tag save(Tag tag) {
         return tagRepository.save(tag);
     }
 
-    // Newly added: find all tags
+    // Find all tags
     public List<Tag> findAll() {
         return tagRepository.findAll();
     }
 
-    // Newly added: find tag by ID
+    // Find tag by ID
     public Optional<Tag> findById(Long id) {
         return tagRepository.findById(id);
     }
 
-    // Existing method to find tag by name
+    // Find tag by name
     public Optional<Tag> findByName(String name){
         return tagRepository.findByName(name);
     }
@@ -982,6 +956,7 @@ package com.example.blog.service;
 import com.example.blog.model.Post;
 import com.example.blog.repository.PostRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -998,7 +973,7 @@ public class PostService {
     }
 
     public List<Post> findAll(){
-        return postRepository.findAll();
+        return postRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     public Optional<Post> findById(Long id){
@@ -1012,39 +987,8 @@ public class PostService {
     public void deleteById(Long id){
         postRepository.deleteById(id);
     }
-}
 
-
------ /home/zakaria/Desktop/projects/blogSpringBoot-main/src/main/java/com/example/blog/service/EmailService.java -----
-package com.example.blog.service;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.stereotype.Service;
-import com.example.blog.model.User;
-
-@Service
-public class EmailService {
-
-    @Autowired
-    private JavaMailSender mailSender;
-
-    @Value("${spring.mail.username}")
-    private String fromEmail;
-
-    public void sendCommentNotification(User toUser, String postTitle, String postUrl) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromEmail);
-        message.setTo(toUser.getEmail());
-        message.setSubject("New Comment on Your Subscribed Post: " + postTitle);
-        message.setText("Hello " + toUser.getName() + ",\n\n" +
-                "A new comment has been added to the post \"" + postTitle + "\".\n" +
-                "You can view the comment here: " + postUrl + "\n\n" +
-                "Best regards,\nBlogio Team");
-        mailSender.send(message);
-    }
+    // Additional methods for searching and sorting can be added here
 }
 
 
@@ -1055,18 +999,22 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "posts")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Post {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     private String title;
@@ -1081,22 +1029,48 @@ public class Post {
     // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
+    @ToString.Exclude
     private User author;
 
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Comment> comments;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Comment> comments = new HashSet<>();
 
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Reaction> reactions;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Reaction> reactions = new HashSet<>();
 
-    // New Many-to-Many for Tags
+    // Many-to-Many for Tags
     @ManyToMany
     @JoinTable(
             name = "post_tags",
             joinColumns = @JoinColumn(name = "post_id"),
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
-    private Set<Tag> tags;
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Tag> tags = new HashSet<>();
+
+    // Helper Methods
+    public void addComment(Comment comment) {
+        comments.add(comment);
+        comment.setPost(this);
+    }
+
+    public void removeComment(Comment comment) {
+        comments.remove(comment);
+        comment.setPost(null);
+    }
+
+    public void addTag(Tag tag) {
+        tags.add(tag);
+        tag.getPosts().add(this);
+    }
+
+    public void removeTag(Tag tag) {
+        tags.remove(tag);
+        tag.getPosts().remove(this);
+    }
 }
 
 
@@ -1110,14 +1084,17 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "comments")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Comment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(columnDefinition = "TEXT")
@@ -1128,10 +1105,12 @@ public class Comment {
     // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
+    @ToString.Exclude
     private Post post;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 }
 
@@ -1144,14 +1123,17 @@ import lombok.*;
 
 @Entity
 @Table(name = "reactions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Reaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     private String type; // e.g., "LIKE", "DISLIKE"
@@ -1159,10 +1141,12 @@ public class Reaction {
     // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
+    @ToString.Exclude
     private Post post;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 }
 
@@ -1173,28 +1157,42 @@ package com.example.blog.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "tags")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Tag {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false, unique = true)
     private String name;
 
-    // A tag can belong to many posts, and a post can have many tags
+    // Many-to-Many with Posts
     @ManyToMany(mappedBy = "tags")
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    private Set<Post> posts;
+    private Set<Post> posts = new HashSet<>();
+
+    // Helper Methods
+    public void addPost(Post post) {
+        posts.add(post);
+        post.getTags().add(this);
+    }
+
+    public void removePost(Post post) {
+        posts.remove(post);
+        post.getTags().remove(this);
+    }
 }
 
 
@@ -1206,24 +1204,29 @@ import lombok.*;
 
 @Entity
 @Table(name = "subscriptions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Subscription {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     // The user who subscribes
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @ToString.Exclude
     private User user;
 
     // The post the user subscribes to
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
+    @ToString.Exclude
     private Post post;
 }
 
@@ -1234,18 +1237,22 @@ package com.example.blog.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "users")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false, unique = true)
@@ -1258,13 +1265,16 @@ public class User {
 
     // Relationships
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Post> posts;
+    @ToString.Exclude
+    private Set<Post> posts = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Comment> comments;
+    @ToString.Exclude
+    private Set<Comment> comments = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Reaction> reactions;
+    @ToString.Exclude
+    private Set<Reaction> reactions = new HashSet<>();
 }
 
 
@@ -1390,11 +1400,13 @@ public class User {
         <div class="mt-3" th:if="${not #lists.isEmpty(post.tags)}">
             <h5>Tags:</h5>
             <div>
-                <span th:each="tag : ${post.tags}" class="badge bg-info me-1" th:text="${tag.name}">Tag</span>
+                <span th:each="tag : ${post.tags}" class="badge bg-info me-1">
+                    <a th:href="@{'/tags/' + ${tag.id}}" class="text-white text-decoration-none" th:text="${tag.name}">Tag</a>
+                </span>
             </div>
         </div>
 
-        <div th:if="${#authentication.principal.username == post.author.email}" class="mt-4">
+        <div th:if="${#authentication.principal != null and #authentication.principal.username == post.author.email}" class="mt-4">
             <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
                 <i class="fas fa-edit"></i> Edit Post
             </a>
@@ -1429,12 +1441,16 @@ public class User {
 
         <!-- Subscribe / Unsubscribe buttons -->
         <div class="mb-4" th:if="${#authentication.principal != null}">
-            <form th:action="@{'/subscriptions/' + (${isSubscribed} ? 'unsubscribe/' + ${post.id} : 'subscribe/' + ${post.id})}"
-                  method="post">
-                <button type="submit" class="btn neumorphic-button"
-                        th:classappend="${isSubscribed} ? 'btn-danger' : 'btn-info'">
-                    <i th:class="${isSubscribed} ? 'fas fa-bell-slash' : 'fas fa-bell'"></i>
-                    <span th:text="${isSubscribed} ? 'Unsubscribe' : 'Subscribe'">Subscribe</span>
+            <form th:action="@{'/subscriptions/unsubscribe/' + ${post.id}}" th:if="${isSubscribed}" method="post">
+                <button type="submit" class="btn btn-danger neumorphic-button">
+                    <i class="fas fa-bell-slash"></i>
+                    Unsubscribe
+                </button>
+            </form>
+            <form th:action="@{'/subscriptions/subscribe/' + ${post.id}}" th:unless="${isSubscribed}" method="post">
+                <button type="submit" class="btn btn-info neumorphic-button">
+                    <i class="fas fa-bell"></i>
+                    Subscribe
                 </button>
             </form>
         </div>
@@ -2010,7 +2026,7 @@ public class User {
             <div class="mb-3">
                 <label for="tagsInput" class="form-label">Tags (comma-separated)</label>
                 <input type="text" class="form-control neumorphic-input" id="tagsInput" name="tags"
-                       placeholder="e.g. Java, Spring, Boot"/>
+                       placeholder="e.g. Java, Spring, Boot" th:value="${tagsInput}" />
                 <div class="form-text">
                     If you leave this blank, the existing tags will be cleared.
                     Provide comma-separated tags to update them.

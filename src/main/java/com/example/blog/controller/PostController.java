@@ -66,8 +66,8 @@ public class PostController {
     @PostMapping("/posts/create")
     @Transactional
     public String createPost(@ModelAttribute Post post,
+                             @RequestParam(value = "tagsInput", required = false) String tagsInput,
                              @RequestParam("imageFile") MultipartFile imageFile,
-                             @RequestParam(value = "tags", required = false) String tagsInput,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
 
@@ -229,8 +229,8 @@ public class PostController {
     @Transactional
     public String editPost(@PathVariable Long id,
                            @ModelAttribute Post updatedPost,
+                           @RequestParam(value = "tagsInput", required = false) String tagsInput,
                            @RequestParam("imageFile") MultipartFile imageFile,
-                           @RequestParam(value = "tags", required = false) String tagsInput,
                            Authentication authentication,
                            RedirectAttributes redirectAttributes) {
 
