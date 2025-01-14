@@ -104,7 +104,6 @@ import java.util.Optional;
 public interface ReactionRepository extends JpaRepository<Reaction, Long> {
     Optional<Reaction> findByUserAndPost(User user, Post post);
 
-    // Count how many likes or dislikes a post has
     long countByPostAndType(Post post, String type);
 }
 
@@ -213,21 +212,18 @@ public class TagController {
         this.tagService = tagService;
     }
 
-    // Display a list of all tags
     @GetMapping("/tags")
     public String showAllTags(Model model) {
         model.addAttribute("tags", tagService.findAll());
         return "tags_list";
     }
 
-    // Display all posts belonging to a specific tag
     @GetMapping("/tags/{id}")
     @Transactional
     public String showPostsByTag(@PathVariable Long id, Model model) {
         Tag tag = tagService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid tag ID: " + id));
         model.addAttribute("tag", tag);
-        // The Post objects are accessible via tag.getPosts()
         model.addAttribute("posts", tag.getPosts());
         return "tag_posts";
     }
@@ -280,26 +276,21 @@ public class CommentController {
                              @RequestParam String content,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
-        // 1) Find current user by email
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Fetch the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 3) Create the comment
         Comment comment = Comment.builder()
                 .content(content)
                 .createdAt(LocalDateTime.now())
                 .user(user)
                 .build();
 
-        // 4) Associate comment with post using helper method
         post.addComment(comment);
 
-        // 5) Save the post (cascades to comment)
         postService.save(post);
 
         redirectAttributes.addFlashAttribute("success", "Comment added successfully!");
@@ -498,7 +489,7 @@ public class PostController {
             redirectAttributes.addFlashAttribute("error", "You are not authorized to delete this post.");
             return "redirect:/posts/" + id;
         }
-        // Optionally, delete the image file if exists
+
         if (post.getImagePath() != null) {
             File imageFile = new File(uploadDir, post.getImagePath().replace("/uploads/", ""));
             if (imageFile.exists()) {
@@ -524,16 +515,13 @@ public class PostController {
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve logged-in user
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Set post fields
         post.setAuthor(user);
         post.setCreatedAt(LocalDateTime.now());
 
-        // 3) Handle image upload
         if (!imageFile.isEmpty()) {
             try {
                 File uploadFolder = new File(uploadDir);
@@ -559,7 +547,6 @@ public class PostController {
             }
         }
 
-        // 4) Parse the tags (if any)
         if (tagsInput != null && !tagsInput.trim().isEmpty()) {
             String[] tagNames = tagsInput.split(",");
             Set<Tag> tagSet = new HashSet<>();
@@ -574,7 +561,6 @@ public class PostController {
             post.setTags(tagSet);
         }
 
-        // 5) Save the post
         postService.save(post);
         redirectAttributes.addFlashAttribute("success", "Post created successfully!");
         return "redirect:/";
@@ -587,22 +573,18 @@ public class PostController {
                            @RequestParam(value = "error", required = false) String error,
                            Authentication authentication) {
 
-        // 1) Retrieve the Post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Count like/dislike
         long likeCount = reactionService.countByPostAndType(post, "LIKE");
         long dislikeCount = reactionService.countByPostAndType(post, "DISLIKE");
 
-        // 3) Pass to the view
         model.addAttribute("post", post);
         model.addAttribute("comments", post.getComments());
         model.addAttribute("likeCount", likeCount);
         model.addAttribute("dislikeCount", dislikeCount);
         model.addAttribute("error", error);
 
-        // 4) Check subscription status for the logged-in user
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
             User user = userRepository.findByEmail(email).orElse(null);
@@ -621,16 +603,13 @@ public class PostController {
                               Authentication authentication,
                               RedirectAttributes redirectAttributes) {
 
-        // 1) Ensure user is found
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Retrieve the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 3) Check existing reaction
         Optional<Reaction> existingReaction = reactionService.findByUserAndPost(user, post);
         if (existingReaction.isPresent()) {
             Reaction reaction = existingReaction.get();
@@ -656,21 +635,17 @@ public class PostController {
                                    Authentication authentication,
                                    RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Check ownership
         String email = authentication.getName();
         if (!post.getAuthor().getEmail().equals(email)) {
             redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
             return "redirect:/posts/" + id;
         }
 
-        // 3) Pass to the model
         model.addAttribute("post", post);
 
-        // Prepare tags as comma-separated string
         String tags = String.join(", ",
                 post.getTags().stream().map(Tag::getName).toArray(String[]::new));
         model.addAttribute("tagsInput", tags);
@@ -687,18 +662,15 @@ public class PostController {
                            Authentication authentication,
                            RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve existing post
         Post existingPost = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Check ownership
         String email = authentication.getName();
         if (!existingPost.getAuthor().getEmail().equals(email)) {
             redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
             return "redirect:/posts/" + id;
         }
 
-        // 3) Update fields
         existingPost.setTitle(updatedPost.getTitle());
         existingPost.setContent(updatedPost.getContent());
 
@@ -720,7 +692,6 @@ public class PostController {
                 File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
                 imageFile.transferTo(destinationFile);
 
-                // If there was an old image, try to delete it
                 if (existingPost.getImagePath() != null) {
                     String oldImageName = existingPost.getImagePath().replace("/uploads/", "");
                     File oldImage = new File(uploadDir, oldImageName);
@@ -729,7 +700,6 @@ public class PostController {
                     }
                 }
 
-                // Set new image path
                 existingPost.setImagePath("/uploads/" + uniqueFilename);
 
             } catch (IOException e) {
@@ -739,7 +709,6 @@ public class PostController {
             }
         }
 
-        // 5) Handle Tags (if any)
         if (tagsInput != null && !tagsInput.trim().isEmpty()) {
             String[] tagNames = tagsInput.split(",");
             Set<Tag> newTagSet = new HashSet<>();
@@ -751,25 +720,21 @@ public class PostController {
                 }
             }
 
-            // Remove existing tags not in newTagSet
             Set<Tag> tagsToRemove = new HashSet<>(existingPost.getTags());
             tagsToRemove.removeAll(newTagSet);
             for (Tag tag : tagsToRemove) {
                 existingPost.removeTag(tag);
             }
 
-            // Add new tags
             for (Tag tag : newTagSet) {
                 existingPost.addTag(tag);
             }
         } else {
-            // If user leaves tag field blank, clear all tags
             for (Tag tag : new HashSet<>(existingPost.getTags())) {
                 existingPost.removeTag(tag);
             }
         }
 
-        // 6) Save
         try {
             postService.save(existingPost);
             redirectAttributes.addFlashAttribute("success", "Post updated successfully!");
@@ -804,28 +769,23 @@ public class TagService {
         this.tagRepository = tagRepository;
     }
 
-    // Create or find a tag by name
     public Tag findOrCreateTag(String name) {
         return tagRepository.findByName(name)
                 .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
     }
 
-    // Save a Tag entity
     public Tag save(Tag tag) {
         return tagRepository.save(tag);
     }
 
-    // Find all tags
     public List<Tag> findAll() {
         return tagRepository.findAll();
     }
 
-    // Find tag by ID
     public Optional<Tag> findById(Long id) {
         return tagRepository.findById(id);
     }
 
-    // Find tag by name
     public Optional<Tag> findByName(String name){
         return tagRepository.findByName(name);
     }
@@ -928,10 +888,8 @@ public class SubscriptionService {
     public Subscription subscribe(User user, Post post) {
         Optional<Subscription> existing = subscriptionRepository.findByUserAndPost(user, post);
         if (existing.isPresent()) {
-            // Already subscribed, so just return it
             return existing.get();
         }
-        // Otherwise create a new one
         Subscription subscription = Subscription.builder()
                 .user(user)
                 .post(post)
@@ -984,7 +942,6 @@ public class ReactionService {
         return reactionRepository.save(reaction);
     }
 
-    // Count how many likes or dislikes a post has
     public long countByPostAndType(Post post, String type) {
         return reactionRepository.countByPostAndType(post, type);
     }
@@ -1033,8 +990,6 @@ public class PostService {
     public List<Post> findByAuthor(User author){
         return postRepository.findByAuthor(author, Sort.by(Sort.Direction.DESC, "createdAt"));
     }
-
-    // Additional methods for searching and sorting can be added here
 }
 
 
@@ -1072,7 +1027,6 @@ public class Post {
 
     private String imagePath;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
@@ -1086,7 +1040,6 @@ public class Post {
     @ToString.Exclude
     private Set<Reaction> reactions = new HashSet<>();
 
-    // Many-to-Many for Tags
     @ManyToMany
     @JoinTable(
             name = "post_tags",
@@ -1097,7 +1050,6 @@ public class Post {
     @EqualsAndHashCode.Exclude
     private Set<Tag> tags = new HashSet<>();
 
-    // Helper Methods
     public void addComment(Comment comment) {
         comments.add(comment);
         comment.setPost(this);
@@ -1148,7 +1100,6 @@ public class Comment {
 
     private LocalDateTime createdAt;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @ToString.Exclude
@@ -1184,7 +1135,6 @@ public class Reaction {
 
     private String type; // e.g., "LIKE", "DISLIKE"
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @ToString.Exclude
@@ -1224,13 +1174,11 @@ public class Tag {
     @Column(nullable = false, unique = true)
     private String name;
 
-    // Many-to-Many with Posts
     @ManyToMany(mappedBy = "tags")
     @ToString.Exclude
     @Builder.Default
     private Set<Post> posts = new HashSet<>();
 
-    // Helper Methods
     public void addPost(Post post) {
         posts.add(post);
         post.getTags().add(this);
@@ -1264,13 +1212,11 @@ public class Subscription {
     @EqualsAndHashCode.Include
     private Long id;
 
-    // The user who subscribes
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @ToString.Exclude
     private User user;
 
-    // The post the user subscribes to
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @ToString.Exclude
@@ -1310,7 +1256,6 @@ public class User {
 
     private String name;
 
-    // Relationships
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
     private Set<Post> posts = new HashSet<>();
@@ -1335,7 +1280,7 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
 <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
     <div class="neumorphic-card" style="min-width: 300px;">
@@ -1378,9 +1323,9 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button"
@@ -1394,6 +1339,11 @@ public class User {
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <a class="nav-link" href="/posts/create">
                         <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1449,7 +1399,7 @@ public class User {
             </div>
         </div>
 
-        <div th:if="${#authentication.principal != null and #authentication.principal.username == post.author.email}" class="mt-4">
+        <div class="mt-4" th:if="${#authentication.principal != null and #authentication.principal.username == post.author.email}">
             <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
                 <i class="fas fa-edit"></i> Edit Post
             </a>
@@ -1525,7 +1475,7 @@ public class User {
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 
@@ -1543,9 +1493,9 @@ public class User {
   <link href="/css/styles.css" rel="stylesheet"/>
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="/">Blogio</a>
     <button class="navbar-toggler" type="button"
@@ -1562,6 +1512,16 @@ public class User {
           </a>
         </li>
         <li class="nav-item" th:if="${#authentication.principal != null}">
+          <a class="nav-link" href="/my-posts">
+            <i class="fas fa-list"></i> My Posts
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="/tags">
+            <i class="fas fa-tag"></i> All Tags
+          </a>
+        </li>
+        <li class="nav-item" th:if="${#authentication.principal != null}">
           <form th:action="@{/logout}" method="post" class="d-inline">
             <button type="submit" class="btn btn-link nav-link">
               <i class="fas fa-sign-out-alt"></i> Logout
@@ -1569,14 +1529,13 @@ public class User {
           </form>
         </li>
         <li class="nav-item" th:if="${#authentication.principal == null}">
-          <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Login</a>
+          <a class="nav-link" href="/login">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </a>
         </li>
         <li class="nav-item" th:if="${#authentication.principal == null}">
-          <a class="nav-link" href="/register"><i class="fas fa-user-plus"></i> Register</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link active" href="/tags">
-            <i class="fas fa-tag"></i> All Tags
+          <a class="nav-link" href="/register">
+            <i class="fas fa-user-plus"></i> Register
           </a>
         </li>
       </ul>
@@ -1605,7 +1564,7 @@ public class User {
 
 <footer class="footer text-center py-3">
   <div class="container">
-    <span>&copy; 2025 Blogio. All rights reserved.</span>
+    <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
   </div>
 </footer>
 
@@ -1624,9 +1583,9 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button"
@@ -1639,6 +1598,12 @@ public class User {
             <ul class="navbar-nav ms-auto me-4">
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <a class="nav-link" href="/posts/create">Create Post</a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">My Posts</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">All Tags</a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
@@ -1664,6 +1629,12 @@ public class User {
     </div>
 </div>
 
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
 <script src="/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
@@ -1678,7 +1649,7 @@ public class User {
     <link href="/css/styles.css" rel="stylesheet"/>
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-dark">
+<body class="bg-dark text-light">
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
@@ -1788,9 +1759,9 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -1810,11 +1781,26 @@ public class User {
                     </a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
                         <button type="submit" class="btn btn-link nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
                 </li>
             </ul>
         </div>
@@ -1836,7 +1822,7 @@ public class User {
 
             <div class="mb-3">
                 <label for="editor" class="form-label">Content</label>
-                <div id="editor" style="height: 300px; background-color: #fff;"></div>
+                <div id="editor" style="height: 300px; background-color: #2a2a2a;"></div>
             </div>
 
             <input type="hidden" th:field="*{content}" id="quillHtmlContent"/>
@@ -1863,7 +1849,7 @@ public class User {
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 
@@ -1895,9 +1881,9 @@ public class User {
     <link href="/css/styles.css" rel="stylesheet"/>
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button"
@@ -1914,6 +1900,16 @@ public class User {
                     </a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
                         <button type="submit" class="btn btn-link nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
@@ -1921,14 +1917,13 @@ public class User {
                     </form>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal == null}">
-                    <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal == null}">
-                    <a class="nav-link" href="/register"><i class="fas fa-user-plus"></i> Register</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/tags">
-                        <i class="fas fa-tag"></i> All Tags
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
                     </a>
                 </li>
             </ul>
@@ -1937,9 +1932,7 @@ public class User {
 </nav>
 
 <div class="container py-4">
-    <h2 class="mb-4">
-        Posts for Tag: <span th:text="${tag.name}">Tag Name</span>
-    </h2>
+    <h2 class="mb-4">Posts for Tag: <span th:text="${tag.name}">Tag Name</span></h2>
 
     <div th:if="${#lists.isEmpty(posts)}">
         <p>No posts found for this tag.</p>
@@ -1967,7 +1960,7 @@ public class User {
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 
@@ -1986,7 +1979,7 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-dark">
+<body class="bg-dark text-light">
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
@@ -2040,10 +2033,10 @@ public class User {
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-    <h2 class="mb-4 text-light">All Posts</h2>
+    <h2 class="mb-4">All Posts</h2>
 
     <div th:if="${#lists.isEmpty(posts)}">
-        <p class="text-light">No posts yet. Be the first to create one!</p>
+        <p>No posts yet. Be the first to create one!</p>
     </div>
 
     <div th:each="post : ${posts}" class="post-card">
@@ -2086,7 +2079,7 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
 <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
     <div class="neumorphic-card" style="min-width: 300px;">
@@ -2127,9 +2120,9 @@ public class User {
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button"
@@ -2150,11 +2143,26 @@ public class User {
                     </a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
                         <button type="submit" class="btn btn-link nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
                 </li>
             </ul>
         </div>
@@ -2180,7 +2188,7 @@ public class User {
 
             <div class="mb-3">
                 <label for="editor" class="form-label">Content</label>
-                <div id="editor" style="height: 300px; background-color: #fff;"></div>
+                <div id="editor" style="height: 300px; background-color: #2a2a2a;"></div>
             </div>
 
             <input type="hidden" th:field="*{content}" id="quillHtmlContent"/>
@@ -2216,7 +2224,7 @@ public class User {
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 

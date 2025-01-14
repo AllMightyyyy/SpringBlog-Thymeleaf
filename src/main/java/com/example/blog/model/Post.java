@@ -44,6 +44,10 @@ public class Post {
     @ToString.Exclude
     private Set<Reaction> reactions = new HashSet<>();
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Subscription> subscriptions = new HashSet<>();
+
     @ManyToMany
     @JoinTable(
             name = "post_tags",
@@ -72,5 +76,15 @@ public class Post {
     public void removeTag(Tag tag) {
         tags.remove(tag);
         tag.getPosts().remove(this);
+    }
+
+    public void addSubscription(Subscription subscription) {
+        subscriptions.add(subscription);
+        subscription.setPost(this);
+    }
+
+    public void removeSubscription(Subscription subscription) {
+        subscriptions.remove(subscription);
+        subscription.setPost(null);
     }
 }

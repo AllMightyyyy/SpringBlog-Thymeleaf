@@ -84,7 +84,7 @@ public class PostController {
                 imageFile.delete();
             }
         }
-        postService.deleteById(id);
+        postService.deleteById(id); // Cascade deletes Subscriptions
         redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
         return "redirect:/my-posts";
     }

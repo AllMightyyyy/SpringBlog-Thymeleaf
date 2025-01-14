@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
     Optional<Subscription> findByUserAndPost(User user, Post post);
     List<Subscription> findByPost(Post post);
+    void deleteByPost(Post post);
 }
