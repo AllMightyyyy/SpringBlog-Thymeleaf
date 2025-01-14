@@ -18,28 +18,23 @@ public class TagService {
         this.tagRepository = tagRepository;
     }
 
-    // Create or find a tag by name
     public Tag findOrCreateTag(String name) {
         return tagRepository.findByName(name)
                 .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
     }
 
-    // Save a Tag entity
     public Tag save(Tag tag) {
         return tagRepository.save(tag);
     }
 
-    // Find all tags
     public List<Tag> findAll() {
         return tagRepository.findAll();
     }
 
-    // Find tag by ID
     public Optional<Tag> findById(Long id) {
         return tagRepository.findById(id);
     }
 
-    // Find tag by name
     public Optional<Tag> findByName(String name){
         return tagRepository.findByName(name);
     }

@@ -7,9 +7,9 @@
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button"
@@ -23,6 +23,11 @@
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <a class="nav-link" href="/posts/create">
                         <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
                     </a>
                 </li>
                 <li class="nav-item">
@@ -78,7 +83,7 @@
             </div>
         </div>
 
-        <div th:if="${#authentication.principal != null and #authentication.principal.username == post.author.email}" class="mt-4">
+        <div class="mt-4" th:if="${#authentication.principal != null and #authentication.principal.username == post.author.email}">
             <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
                 <i class="fas fa-edit"></i> Edit Post
             </a>
@@ -154,7 +159,7 @@
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 

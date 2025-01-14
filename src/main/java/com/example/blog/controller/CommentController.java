@@ -43,26 +43,21 @@ public class CommentController {
                              @RequestParam String content,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
-        // 1) Find current user by email
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Fetch the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 3) Create the comment
         Comment comment = Comment.builder()
                 .content(content)
                 .createdAt(LocalDateTime.now())
                 .user(user)
                 .build();
 
-        // 4) Associate comment with post using helper method
         post.addComment(comment);
 
-        // 5) Save the post (cascades to comment)
         postService.save(post);
 
         redirectAttributes.addFlashAttribute("success", "Comment added successfully!");

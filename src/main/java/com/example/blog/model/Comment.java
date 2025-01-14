@@ -25,7 +25,6 @@ public class Comment {
 
     private LocalDateTime createdAt;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @ToString.Exclude

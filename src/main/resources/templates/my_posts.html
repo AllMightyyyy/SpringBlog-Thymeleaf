@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Home</title>
+    <title>My Posts</title>
     <link href="/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="/css/styles.css" rel="stylesheet"/>
-
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
 <body class="bg-dark text-light">
@@ -61,10 +60,10 @@
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-    <h2 class="mb-4">All Posts</h2>
+    <h2 class="mb-4 text-light">My Posts</h2>
 
     <div th:if="${#lists.isEmpty(posts)}">
-        <p>No posts yet. Be the first to create one!</p>
+        <p class="text-light">You haven't created any posts yet.</p>
     </div>
 
     <div th:each="post : ${posts}" class="post-card">
@@ -79,6 +78,14 @@
             <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
                 <i class="fas fa-book-open"></i> Read More
             </a>
+            <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <form th:action="@{'/posts/' + ${post.id} + '/delete'}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-danger neumorphic-button" onclick="return confirm('Are you sure you want to delete this post?');">
+                    <i class="fas fa-trash-alt"></i> Delete
+                </button>
+            </form>
         </div>
         <div>
             <img th:if="${post.imagePath != null}" th:src="${post.imagePath}" alt="Post Image" class="post-image"/>

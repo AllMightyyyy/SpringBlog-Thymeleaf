@@ -1,6 +1,7 @@
 package com.example.blog.service;
 
 import com.example.blog.model.Post;
+import com.example.blog.model.User;
 import com.example.blog.repository.PostRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -35,5 +36,7 @@ public class PostService {
         postRepository.deleteById(id);
     }
 
-    // Additional methods for searching and sorting can be added here
+    public List<Post> findByAuthor(User author){
+        return postRepository.findByAuthor(author, Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
 }

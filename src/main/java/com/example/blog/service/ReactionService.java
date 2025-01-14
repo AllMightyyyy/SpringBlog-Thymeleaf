@@ -27,7 +27,6 @@ public class ReactionService {
         return reactionRepository.save(reaction);
     }
 
-    // Count how many likes or dislikes a post has
     public long countByPostAndType(Post post, String type) {
         return reactionRepository.countByPostAndType(post, type);
     }

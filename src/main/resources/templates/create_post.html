@@ -9,9 +9,9 @@
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light">
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/">Blogio</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -31,11 +31,26 @@
                     </a>
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
                         <button type="submit" class="btn btn-link nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
                 </li>
             </ul>
         </div>
@@ -57,7 +72,7 @@
 
             <div class="mb-3">
                 <label for="editor" class="form-label">Content</label>
-                <div id="editor" style="height: 300px; background-color: #fff;"></div>
+                <div id="editor" style="height: 300px; background-color: #2a2a2a;"></div>
             </div>
 
             <input type="hidden" th:field="*{content}" id="quillHtmlContent"/>
@@ -84,7 +99,7 @@
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span>&copy; 2025 Blogio. All rights reserved.</span>
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 

@@ -24,13 +24,11 @@ public class Tag {
     @Column(nullable = false, unique = true)
     private String name;
 
-    // Many-to-Many with Posts
     @ManyToMany(mappedBy = "tags")
     @ToString.Exclude
     @Builder.Default
     private Set<Post> posts = new HashSet<>();
 
-    // Helper Methods
     public void addPost(Post post) {
         posts.add(post);
         post.getTags().add(this);

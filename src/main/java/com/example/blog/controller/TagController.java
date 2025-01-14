@@ -18,21 +18,18 @@ public class TagController {
         this.tagService = tagService;
     }
 
-    // Display a list of all tags
     @GetMapping("/tags")
     public String showAllTags(Model model) {
         model.addAttribute("tags", tagService.findAll());
         return "tags_list";
     }
 
-    // Display all posts belonging to a specific tag
     @GetMapping("/tags/{id}")
     @Transactional
     public String showPostsByTag(@PathVariable Long id, Model model) {
         Tag tag = tagService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid tag ID: " + id));
         model.addAttribute("tag", tag);
-        // The Post objects are accessible via tag.getPosts()
         model.addAttribute("posts", tag.getPosts());
         return "tag_posts";
     }

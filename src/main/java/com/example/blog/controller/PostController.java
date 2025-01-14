@@ -57,6 +57,38 @@ public class PostController {
         return "home";
     }
 
+    @GetMapping("/my-posts")
+    public String myPosts(Model model, Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        List<Post> posts = postService.findByAuthor(user);
+        model.addAttribute("posts", posts);
+        return "my_posts";
+    }
+
+    @PostMapping("/posts/{id}/delete")
+    @Transactional
+    public String deletePost(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+        String email = authentication.getName();
+        if (!post.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to delete this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        if (post.getImagePath() != null) {
+            File imageFile = new File(uploadDir, post.getImagePath().replace("/uploads/", ""));
+            if (imageFile.exists()) {
+                imageFile.delete();
+            }
+        }
+        postService.deleteById(id);
+        redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
+        return "redirect:/my-posts";
+    }
+
     @GetMapping("/posts/create")
     public String showCreatePostForm(Model model) {
         model.addAttribute("post", new Post());
@@ -71,16 +103,13 @@ public class PostController {
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve logged-in user
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Set post fields
         post.setAuthor(user);
         post.setCreatedAt(LocalDateTime.now());
 
-        // 3) Handle image upload
         if (!imageFile.isEmpty()) {
             try {
                 File uploadFolder = new File(uploadDir);
@@ -106,7 +135,6 @@ public class PostController {
             }
         }
 
-        // 4) Parse the tags (if any)
         if (tagsInput != null && !tagsInput.trim().isEmpty()) {
             String[] tagNames = tagsInput.split(",");
             Set<Tag> tagSet = new HashSet<>();
@@ -121,7 +149,6 @@ public class PostController {
             post.setTags(tagSet);
         }
 
-        // 5) Save the post
         postService.save(post);
         redirectAttributes.addFlashAttribute("success", "Post created successfully!");
         return "redirect:/";
@@ -134,22 +161,18 @@ public class PostController {
                            @RequestParam(value = "error", required = false) String error,
                            Authentication authentication) {
 
-        // 1) Retrieve the Post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Count like/dislike
         long likeCount = reactionService.countByPostAndType(post, "LIKE");
         long dislikeCount = reactionService.countByPostAndType(post, "DISLIKE");
 
-        // 3) Pass to the view
         model.addAttribute("post", post);
         model.addAttribute("comments", post.getComments());
         model.addAttribute("likeCount", likeCount);
         model.addAttribute("dislikeCount", dislikeCount);
         model.addAttribute("error", error);
 
-        // 4) Check subscription status for the logged-in user
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
             User user = userRepository.findByEmail(email).orElse(null);
@@ -168,16 +191,13 @@ public class PostController {
                               Authentication authentication,
                               RedirectAttributes redirectAttributes) {
 
-        // 1) Ensure user is found
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // 2) Retrieve the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 3) Check existing reaction
         Optional<Reaction> existingReaction = reactionService.findByUserAndPost(user, post);
         if (existingReaction.isPresent()) {
             Reaction reaction = existingReaction.get();
@@ -203,21 +223,17 @@ public class PostController {
                                    Authentication authentication,
                                    RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve the post
         Post post = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Check ownership
         String email = authentication.getName();
         if (!post.getAuthor().getEmail().equals(email)) {
             redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
             return "redirect:/posts/" + id;
         }
 
-        // 3) Pass to the model
         model.addAttribute("post", post);
 
-        // Prepare tags as comma-separated string
         String tags = String.join(", ",
                 post.getTags().stream().map(Tag::getName).toArray(String[]::new));
         model.addAttribute("tagsInput", tags);
@@ -234,18 +250,15 @@ public class PostController {
                            Authentication authentication,
                            RedirectAttributes redirectAttributes) {
 
-        // 1) Retrieve existing post
         Post existingPost = postService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
 
-        // 2) Check ownership
         String email = authentication.getName();
         if (!existingPost.getAuthor().getEmail().equals(email)) {
             redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
             return "redirect:/posts/" + id;
         }
 
-        // 3) Update fields
         existingPost.setTitle(updatedPost.getTitle());
         existingPost.setContent(updatedPost.getContent());
 
@@ -267,7 +280,6 @@ public class PostController {
                 File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
                 imageFile.transferTo(destinationFile);
 
-                // If there was an old image, try to delete it
                 if (existingPost.getImagePath() != null) {
                     String oldImageName = existingPost.getImagePath().replace("/uploads/", "");
                     File oldImage = new File(uploadDir, oldImageName);
@@ -276,7 +288,6 @@ public class PostController {
                     }
                 }
 
-                // Set new image path
                 existingPost.setImagePath("/uploads/" + uniqueFilename);
 
             } catch (IOException e) {
@@ -286,7 +297,6 @@ public class PostController {
             }
         }
 
-        // 5) Handle Tags (if any)
         if (tagsInput != null && !tagsInput.trim().isEmpty()) {
             String[] tagNames = tagsInput.split(",");
             Set<Tag> newTagSet = new HashSet<>();
@@ -298,25 +308,21 @@ public class PostController {
                 }
             }
 
-            // Remove existing tags not in newTagSet
             Set<Tag> tagsToRemove = new HashSet<>(existingPost.getTags());
             tagsToRemove.removeAll(newTagSet);
             for (Tag tag : tagsToRemove) {
                 existingPost.removeTag(tag);
             }
 
-            // Add new tags
             for (Tag tag : newTagSet) {
                 existingPost.addTag(tag);
             }
         } else {
-            // If user leaves tag field blank, clear all tags
             for (Tag tag : new HashSet<>(existingPost.getTags())) {
                 existingPost.removeTag(tag);
             }
         }
 
-        // 6) Save
         try {
             postService.save(existingPost);
             redirectAttributes.addFlashAttribute("success", "Post updated successfully!");

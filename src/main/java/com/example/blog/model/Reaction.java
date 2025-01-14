@@ -20,7 +20,6 @@ public class Reaction {
 
     private String type; // e.g., "LIKE", "DISLIKE"
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
     @ToString.Exclude

@@ -23,10 +23,8 @@ public class SubscriptionService {
     public Subscription subscribe(User user, Post post) {
         Optional<Subscription> existing = subscriptionRepository.findByUserAndPost(user, post);
         if (existing.isPresent()) {
-            // Already subscribed, so just return it
             return existing.get();
         }
-        // Otherwise create a new one
         Subscription subscription = Subscription.builder()
                 .user(user)
                 .post(post)

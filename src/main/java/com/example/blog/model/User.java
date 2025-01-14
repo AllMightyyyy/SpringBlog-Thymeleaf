@@ -29,7 +29,6 @@ public class User {
 
     private String name;
 
-    // Relationships
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
     private Set<Post> posts = new HashSet<>();

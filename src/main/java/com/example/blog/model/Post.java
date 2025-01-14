@@ -31,7 +31,6 @@ public class Post {
 
     private String imagePath;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
@@ -45,7 +44,6 @@ public class Post {
     @ToString.Exclude
     private Set<Reaction> reactions = new HashSet<>();
 
-    // Many-to-Many for Tags
     @ManyToMany
     @JoinTable(
             name = "post_tags",
@@ -56,7 +54,6 @@ public class Post {
     @EqualsAndHashCode.Exclude
     private Set<Tag> tags = new HashSet<>();
 
-    // Helper Methods
     public void addComment(Comment comment) {
         comments.add(comment);
         comment.setPost(this);

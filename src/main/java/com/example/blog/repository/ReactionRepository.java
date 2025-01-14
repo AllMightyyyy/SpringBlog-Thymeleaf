@@ -10,6 +10,5 @@ import java.util.Optional;
 public interface ReactionRepository extends JpaRepository<Reaction, Long> {
     Optional<Reaction> findByUserAndPost(User user, Post post);
 
-    // Count how many likes or dislikes a post has
     long countByPostAndType(Post post, String type);
 }
