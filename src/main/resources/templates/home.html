@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Home</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-dark text-light d-flex flex-column min-vh-100">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">Blogio</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav ms-auto me-4">
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/posts/create">
+                        <i class="fas fa-pen"></i> Create Post
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <a class="nav-link" href="/my-posts">
+                        <i class="fas fa-list"></i> My Posts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag"></i> All Tags
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal != null}">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link nav-link">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${#authentication.principal == null}">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus"></i> Register
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4 flex-grow-1">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <h2 class="mb-4">All Posts</h2>
+
+    <div th:if="${#lists.isEmpty(posts)}" class="text-center">
+        <p>No posts yet. Be the first to create one!</p>
+    </div>
+
+    <div th:each="post : ${posts}" class="post-card">
+        <div class="post-content">
+            <h5 class="post-title" th:text="${post.title}">Post Title</h5>
+            <p class="text-muted">
+                By <strong th:text="${post.author.name}">Author</strong>
+                &bull;
+                <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
+            </p>
+            <div class="post-excerpt" th:utext="${#strings.abbreviate(post.content, 150)}"></div>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
+                <i class="fas fa-book-open"></i> Read More
+            </a>
+        </div>
+        <div>
+            <img th:if="${post.imagePath != null}" th:src="${post.imagePath}" alt="Post Image" class="post-image"/>
+        </div>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
