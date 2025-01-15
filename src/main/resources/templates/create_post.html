@@ -3,9 +3,10 @@
 <head>
     <title>Create Post</title>
     <link href="/css/bootstrap.min.css" rel="stylesheet"/>
-    <link href="/css/styles.css" rel="stylesheet"/>
 
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+
+    <link href="/css/styles.css" rel="stylesheet"/>
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
@@ -61,7 +62,7 @@
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-    <div class="neumorphic-card">
+    <div class="card-custom">
         <h2 class="mb-4">Create New Post</h2>
         <form th:action="@{/posts/create}" th:object="${post}" method="post" enctype="multipart/form-data" id="createPostForm">
             <div class="mb-3">
