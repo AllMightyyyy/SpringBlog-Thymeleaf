@@ -6,11 +6,7 @@
     <link href="/css/styles.css" rel="stylesheet"/>
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
-<<<<<<< HEAD
 <body class="bg-dark text-light d-flex flex-column min-vh-100">
-=======
-<body class="bg-dark text-light">
->>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
@@ -60,17 +56,10 @@
     </div>
 </nav>
 
-<<<<<<< HEAD
 <div class="container py-4 flex-grow-1">
     <h2 class="mb-4">Posts for Tag: <span th:text="${tag.name}">Tag Name</span></h2>
 
     <div th:if="${#lists.isEmpty(posts)}" class="text-center">
-=======
-<div class="container py-4">
-    <h2 class="mb-4">Posts for Tag: <span th:text="${tag.name}">Tag Name</span></h2>
-
-    <div th:if="${#lists.isEmpty(posts)}">
->>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
         <p>No posts found for this tag.</p>
     </div>
 
@@ -82,10 +71,6 @@
                 &bull;
                 <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
             </p>
-<<<<<<< HEAD
-=======
-            <!-- Render the post content as HTML -->
->>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
             <div class="post-excerpt" th:utext="${#strings.abbreviate(post.content, 150)}"></div>
             <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
                 <i class="fas fa-book-open"></i> Read More
