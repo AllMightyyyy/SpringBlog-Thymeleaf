@@ -9,7 +9,11 @@
 
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </head>
+<<<<<<< HEAD
 <body class="bg-dark text-light d-flex flex-column min-vh-100">
+=======
+<body class="bg-dark text-light">
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid">
@@ -57,7 +61,11 @@
     </div>
 </nav>
 
+<<<<<<< HEAD
 <div class="container py-4 flex-grow-1">
+=======
+<div class="container py-4">
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
@@ -109,6 +117,7 @@
 
 <script>
     var quill = new Quill('#editor', {
+<<<<<<< HEAD
         theme: 'snow',
         modules: {
             toolbar: [
@@ -123,6 +132,9 @@
                 ['clean']
             ]
         }
+=======
+        theme: 'snow'
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
     });
 
     var form = document.getElementById('createPostForm');

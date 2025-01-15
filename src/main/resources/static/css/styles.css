@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* styles.css */
 
 html, body {
@@ -12,6 +13,11 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+=======
+body {
+    background-color: #121212 !important;
+    color: #e0e0e0;
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 }
 
 /* Neumorphic card style */
@@ -58,7 +64,10 @@ body {
     -10px -10px 30px #2a2a2a;
     margin-bottom: 1rem;
     display: flex;
+<<<<<<< HEAD
     flex-wrap: wrap;
+=======
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
@@ -68,7 +77,10 @@ body {
 .post-content {
     flex: 1;
     margin-right: 1rem;
+<<<<<<< HEAD
     min-width: 250px;
+=======
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 }
 
 /* Post image style */
@@ -78,6 +90,7 @@ body {
     box-shadow: 6px 6px 12px #1a1a1a,
     -6px -6px 12px #3a3a3a;
     object-fit: cover;
+<<<<<<< HEAD
     max-width: 100%;
     height: auto;
     margin-top: 1rem;
@@ -92,6 +105,8 @@ body {
     -6px -6px 12px #3a3a3a;
     object-fit: cover;
     margin-bottom: 1rem;
+=======
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 }
 
 /* Comment card style */
@@ -116,9 +131,12 @@ body {
 .footer {
     background-color: #1e1e1e;
     color: #e0e0e0;
+<<<<<<< HEAD
     text-align: center;
     padding: 1rem 0;
     margin-top: auto;
+=======
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
 }
 
 /* Link styling */
@@ -141,6 +159,7 @@ a:hover {
     color: #e0e0e0;
 }
 
+<<<<<<< HEAD
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .post-card {
@@ -196,3 +215,5 @@ a:hover {
 .container {
     flex: 1 0 auto;
 }
+=======
+>>>>>>> f27a3872b9d205cec9e7aac30349bce38417b4b1
