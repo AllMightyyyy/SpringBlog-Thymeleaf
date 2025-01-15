@@ -39,7 +39,7 @@
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-link nav-link">
+                        <button type="submit" class="btn btn-primary-custom nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
@@ -59,12 +59,12 @@
     </div>
 </nav>
 
-<div class="container py-4 flex-grow-1">
+<div class="container py-5 flex-grow-1">
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-    <div class="neumorphic-card">
-        <h2>Edit Post</h2>
+    <div class="card-custom">
+        <h2 class="mb-4">Edit Post</h2>
         <form th:action="@{'/posts/' + ${post.id} + '/edit'}"
               th:object="${post}" method="post"
               enctype="multipart/form-data" class="mt-3"
@@ -72,20 +72,20 @@
 
             <div class="mb-3">
                 <label for="title" class="form-label">Title</label>
-                <input type="text" th:field="*{title}" class="form-control neumorphic-input"
+                <input type="text" th:field="*{title}" class="form-control"
                        id="title" placeholder="Update post title" required/>
             </div>
 
             <div class="mb-3">
                 <label for="editor" class="form-label">Content</label>
-                <div id="editor" style="height: 300px; background-color: #2a2a2a;"></div>
+                <div id="editor" class="bg-dark text-light" style="height: 300px;"></div>
             </div>
 
             <input type="hidden" th:field="*{content}" id="quillHtmlContent"/>
 
             <div class="mb-3">
                 <label for="tagsInput" class="form-label">Tags (comma-separated)</label>
-                <input type="text" class="form-control neumorphic-input" id="tagsInput" name="tagsInput"
+                <input type="text" class="form-control" id="tagsInput" name="tagsInput"
                        placeholder="e.g. Java, Spring, Boot" th:value="${tagsInput}" />
                 <div class="form-text">
                     If you leave this blank, the existing tags will be cleared.
@@ -96,25 +96,25 @@
             <div class="mb-3">
                 <label class="form-label">Current Image</label>
                 <div th:if="${post.imagePath != null}" class="mb-3">
-                    <img th:src="${post.imagePath}" alt="Current Image" class="img-fluid post-image-full"/>
+                    <img th:src="${post.imagePath}" alt="Current Image" class="post-image-full"/>
                 </div>
                 <label for="imageFile" class="form-label">Change Image (Optional)</label>
-                <input type="file" class="form-control neumorphic-input" id="imageFile" name="imageFile"
+                <input type="file" class="form-control" id="imageFile" name="imageFile"
                        accept="image/*"/>
                 <div class="form-text">Uploading a new image will replace the current one.</div>
             </div>
 
-            <button type="submit" class="btn btn-primary neumorphic-button">
+            <button type="submit" class="btn btn-primary-custom">
                 <i class="fas fa-paper-plane"></i> Update
             </button>
-            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-secondary ms-2 neumorphic-button">Cancel</a>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-secondary-custom ms-2">Cancel</a>
         </form>
     </div>
 </div>
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 

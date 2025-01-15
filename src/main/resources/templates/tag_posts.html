@@ -36,7 +36,7 @@
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-link nav-link">
+                        <button type="submit" class="btn btn-primary-custom nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
@@ -56,7 +56,7 @@
     </div>
 </nav>
 
-<div class="container py-4 flex-grow-1">
+<div class="container py-5 flex-grow-1">
     <h2 class="mb-4">Posts for Tag: <span th:text="${tag.name}">Tag Name</span></h2>
 
     <div th:if="${#lists.isEmpty(posts)}" class="text-center">
@@ -72,7 +72,7 @@
                 <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
             </p>
             <div class="post-excerpt" th:utext="${#strings.abbreviate(post.content, 150)}"></div>
-            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary-custom">
                 <i class="fas fa-book-open"></i> Read More
             </a>
         </div>
@@ -84,7 +84,7 @@
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 

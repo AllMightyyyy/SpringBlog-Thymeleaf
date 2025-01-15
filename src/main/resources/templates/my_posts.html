@@ -36,7 +36,7 @@
                 </li>
                 <li class="nav-item" th:if="${#authentication.principal != null}">
                     <form th:action="@{/logout}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-link nav-link">
+                        <button type="submit" class="btn btn-primary-custom nav-link">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </form>
@@ -56,14 +56,14 @@
     </div>
 </nav>
 
-<div class="container py-4 flex-grow-1">
+<div class="container py-5 flex-grow-1">
     <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
     <h2 class="mb-4 text-light">My Posts</h2>
 
     <div th:if="${#lists.isEmpty(posts)}" class="text-center">
-        <p class="text-light">You haven't created any posts yet.</p>
+        <p>You haven't created any posts yet.</p>
     </div>
 
     <div th:each="post : ${posts}" class="post-card">
@@ -75,14 +75,14 @@
                 <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
             </p>
             <div class="post-excerpt" th:utext="${#strings.abbreviate(post.content, 150)}"></div>
-            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary neumorphic-button">
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary-custom">
                 <i class="fas fa-book-open"></i> Read More
             </a>
-            <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning neumorphic-button">
+            <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning-custom">
                 <i class="fas fa-edit"></i> Edit
             </a>
             <form th:action="@{'/posts/' + ${post.id} + '/delete'}" method="post" class="d-inline">
-                <button type="submit" class="btn btn-danger neumorphic-button" onclick="return confirm('Are you sure you want to delete this post?');">
+                <button type="submit" class="btn btn-danger-custom" onclick="return confirm('Are you sure you want to delete this post?');">
                     <i class="fas fa-trash-alt"></i> Delete
                 </button>
             </form>
@@ -95,7 +95,7 @@
 
 <footer class="footer text-center py-3">
     <div class="container">
-        <span class="text-light">&copy; 2025 Blogio. All rights reserved.</span>
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
     </div>
 </footer>
 
