@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Search Posts</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+
+<div class="container py-5 flex-grow-1">
+    <h2 class="mb-4">Search Posts</h2>
+
+    <form th:action="@{/search/results}" method="get">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" placeholder="Post title">
+        </div>
+
+        <div class="mb-3">
+            <label for="tag" class="form-label">Tag</label>
+            <select class="form-select" id="tag" name="tag">
+                <option value="">-- Select Tag --</option>
+                <option th:each="tag : ${tags}" th:value="${tag.name}" th:text="${tag.name}">Tag Name</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="authorName" class="form-label">Author Name</label>
+            <input type="text" class="form-control" id="authorName" name="authorName" placeholder="Author name">
+        </div>
+
+        <div class="mb-3">
+            <label for="authorEmail" class="form-label">Author Email</label>
+            <input type="email" class="form-control" id="authorEmail" name="authorEmail" placeholder="Author email">
+        </div>
+
+        <div class="mb-3">
+            <label for="createdAfter" class="form-label">Created After</label>
+            <input type="datetime-local" class="form-control" id="createdAfter" name="createdAfter">
+        </div>
+
+        <div class="mb-3">
+            <label for="createdBefore" class="form-label">Created Before</label>
+            <input type="datetime-local" class="form-control" id="createdBefore" name="createdBefore">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+</div>
+
+<div th:replace="~{fragments/chat :: chat}"></div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

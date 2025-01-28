@@ -1,0 +1,67 @@
+<div th:fragment="navbar">
+    <nav class="navbar navbar-expand-lg shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">Blogio</a>
+            <button class="navbar-toggler" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                    aria-controls="navbarSupportedContent" aria-expanded="false"
+                    aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <div class="navbar-nav ms-auto me-4 align-items-center">
+                    <a class="nav-link" href="/chat">
+                        <i class="fas fa-comments me-1"></i> Chat
+                    </a>
+                    <a class="nav-link" href="/posts/create" th:if="${#authentication.principal != null}">
+                        <i class="fas fa-pen me-1"></i> Create Post
+                    </a>
+                    <a class="nav-link" href="/my-posts" th:if="${#authentication.principal != null}">
+                        <i class="fas fa-list me-1"></i> My Posts
+                    </a>
+                    <a class="nav-link" href="/tags">
+                        <i class="fas fa-tag me-1"></i> All Tags
+                    </a>
+                    <a class="nav-link" href="/profiles/me" th:if="${#authentication.principal != null}">
+                        <i class="fas fa-user me-1"></i> My Profile
+                    </a>
+                    <a class="nav-link" href="/search">
+                        <i class="fas fa-search me-1"></i> Search
+                    </a>
+
+                    <!-- Admin Links -->
+                    <a class="nav-link" href="/admin/reported/posts" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+                        <i class="fas fa-exclamation-triangle me-1"></i> Reported Posts
+                    </a>
+                    <a class="nav-link" href="/admin/reported/comments" th:if="${#authorization.expression('hasRole(''ADMIN'')')}">
+                        <i class="fas fa-exclamation-triangle me-1"></i> Reported Comments
+                    </a>
+
+                    <!-- Theme Dropdown -->
+                    <div th:replace="~{fragments/theme-dropdown :: themeDropdown}" class="nav-link"></div>
+
+                    <!-- Logout Form -->
+                    <form th:action="@{/logout}" method="post" class="m-0 p-0 d-inline" th:if="${#authentication.principal != null}">
+                        <!-- Conditionally Include CSRF Token -->
+                        <th:block th:if="${_csrf != null}">
+                            <input type="hidden" th:name="${_csrf.parameterName}"
+                                   th:value="${_csrf.token}" />
+                        </th:block>
+                        <button type="submit" class="btn btn-link nav-link p-0 d-flex align-items-center">
+                            <i class="fas fa-sign-out-alt me-1"></i>
+                            Logout
+                        </button>
+                    </form>
+
+                    <!-- Login and Register Links (Visible to Unauthenticated Users) -->
+                    <a class="nav-link" href="/login" th:if="${#authentication.principal == null}">
+                        <i class="fas fa-sign-in-alt me-1"></i> Login
+                    </a>
+                    <a class="nav-link" href="/register" th:if="${#authentication.principal == null}">
+                        <i class="fas fa-user-plus me-1"></i> Register
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+</div>

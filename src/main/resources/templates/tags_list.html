@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>All Tags</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="/css/styles.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+
+<div class="container py-5 flex-grow-1">
+  <h2 class="mb-4">All Tags</h2>
+
+  <div class="row" th:if="${#lists.isEmpty(tags)}">
+    <div class="col-12 text-center">
+      <div class="alert alert-warning">No tags found.</div>
+    </div>
+  </div>
+
+  <div class="row" th:each="tag : ${tags}">
+    <div class="col-sm-6 col-md-4 col-lg-3 mb-3">
+      <a th:href="@{'/tags/' + ${tag.id}}" class="btn btn-info w-100">
+        <i class="fas fa-tag"></i>
+        <span th:text="${tag.name}">Tag Name</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div th:replace="~{fragments/chat :: chat}"></div>
+
+<footer class="footer text-center py-3">
+  <div class="container">
+    <span>&copy; 2025 Blogio. All rights reserved.</span>
+  </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

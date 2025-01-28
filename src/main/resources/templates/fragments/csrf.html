@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>CSRF Token Fragment</title>
+</head>
+<body>
+<th:block th:fragment="csrf">
+  <th:block th:if="${_csrf != null}">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  </th:block>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Login</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div class="container d-flex justify-content-center align-items-center flex-grow-1">
+    <div class="card-custom" style="min-width: 300px;">
+        <h2 class="text-center mb-4">Login</h2>
+
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+
+        <form th:action="@{/login}" method="post" class="mt-3">
+            <div class="mb-3">
+                <label for="username" class="form-label">Email</label>
+                <input type="text" class="form-control" id="username" name="username" required/>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required/>
+            </div>
+            <button type="submit" class="btn btn-primary-custom w-100">
+                Login
+            </button>
+            <a href="/register" class="btn btn-link mt-2">Register</a>
+        </form>
+    </div>
+</div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

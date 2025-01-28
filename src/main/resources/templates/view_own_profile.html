@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${profile.displayName}">My Profile</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+
+<div class="container py-5 flex-grow-1">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <div class="card-custom p-4">
+        <div class="d-flex align-items-center mb-4">
+            <img th:if="${profile.profileImagePath != null}"
+                 th:src="${profile.profileImagePath}"
+                 alt="Profile Image"
+                 class="rounded-circle me-3"
+                 width="100"
+                 height="100"/>
+            <div>
+                <h2 th:text="${profile.displayName}">Display Name</h2>
+                <p class="text-muted" th:text="${profile.user.email}">@email@example.com</p>
+                <a th:href="@{'/profiles/me/edit'}" class="btn btn-warning">
+                    <i class="fas fa-edit"></i> Edit Profile
+                </a>
+            </div>
+        </div>
+
+        <div>
+            <h4>Bio:</h4>
+            <div th:utext="${profile.bio}" class="quill-content">
+            </div>
+        </div>
+
+        <div th:if="${profile.hasAnySocialUrl()}" class="mt-4">
+            <h4>Connect with me:</h4>
+            <div class="social-links">
+                <a th:if="${profile.twitterUrl != null and !profile.twitterUrl.trim().isEmpty()}"
+                   th:href="${profile.twitterUrl}"
+                   target="_blank"
+                   class="me-3">
+                    <i class="fab fa-twitter fa-2x"></i>
+                </a>
+                <a th:if="${profile.facebookUrl != null and !profile.facebookUrl.trim().isEmpty()}"
+                   th:href="${profile.facebookUrl}"
+                   target="_blank"
+                   class="me-3">
+                    <i class="fab fa-facebook fa-2x"></i>
+                </a>
+                <a th:if="${profile.linkedinUrl != null and !profile.linkedinUrl.trim().isEmpty()}"
+                   th:href="${profile.linkedinUrl}"
+                   target="_blank"
+                   class="me-3">
+                    <i class="fab fa-linkedin fa-2x"></i>
+                </a>
+                <a th:if="${profile.githubUrl != null and !profile.githubUrl.trim().isEmpty()}"
+                   th:href="${profile.githubUrl}"
+                   target="_blank"
+                   class="me-3">
+                    <i class="fab fa-github fa-2x"></i>
+                </a>
+                <a th:if="${profile.instagramUrl != null and !profile.instagramUrl.trim().isEmpty()}"
+                   th:href="${profile.instagramUrl}"
+                   target="_blank"
+                   class="me-3">
+                    <i class="fab fa-instagram fa-2x"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments/chat :: chat}"></div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script>
+</script>
+</body>
+</html>

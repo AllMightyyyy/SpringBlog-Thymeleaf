@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>Edit Profile</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+  <link href="/css/styles.css" rel="stylesheet"/>
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+
+<div class="container py-5 flex-grow-1">
+  <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+  <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+  <div class="card-custom p-4">
+    <h2 class="mb-4">Edit Profile</h2>
+    <form th:action="@{/profiles/me/edit}" th:object="${profile}" method="post" enctype="multipart/form-data" id="editProfileForm">
+      <div class="mb-3">
+        <label for="displayName" class="form-label">Display Name</label>
+        <input type="text" th:field="*{displayName}" class="form-control" id="displayName" placeholder="Enter display name" required/>
+      </div>
+
+      <div class="mb-3">
+        <label for="bioEditor" class="form-label">Bio</label>
+        <div id="bioEditor" style="height: 200px;" class="bg-dark text-light"></div>
+        <input type="hidden" name="bioHtmlContent" id="bioHtmlContent"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="twitterUrl" class="form-label">Twitter URL</label>
+        <input type="url" th:field="*{twitterUrl}" class="form-control" id="twitterUrl" placeholder="https://twitter.com/yourprofile"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="facebookUrl" class="form-label">Facebook URL</label>
+        <input type="url" th:field="*{facebookUrl}" class="form-control" id="facebookUrl" placeholder="https://facebook.com/yourprofile"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="linkedinUrl" class="form-label">LinkedIn URL</label>
+        <input type="url" th:field="*{linkedinUrl}" class="form-control" id="linkedinUrl" placeholder="https://linkedin.com/in/yourprofile"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="githubUrl" class="form-label">GitHub URL</label>
+        <input type="url" th:field="*{githubUrl}" class="form-control" id="githubUrl" placeholder="https://github.com/yourprofile"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="instagramUrl" class="form-label">Instagram URL</label>
+        <input type="url" th:field="*{instagramUrl}" class="form-control" id="instagramUrl" placeholder="https://instagram.com/yourprofile"/>
+      </div>
+
+      <div class="mb-3">
+        <label for="profileImage" class="form-label">Profile Image</label>
+        <input type="file" class="form-control" id="profileImage" name="profileImage" accept="image/*"/>
+        <div class="form-text">Supported formats: JPG, PNG, GIF. Max size: 2MB.</div>
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" th:field="*{isPublic}" id="isPublic"/>
+        <label class="form-check-label" for="isPublic">Make my profile public</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary-custom">
+        <i class="fas fa-save"></i> Save Changes
+      </button>
+      <a th:href="@{/profiles/me}" class="btn btn-secondary-custom">Cancel</a>
+    </form>
+  </div>
+</div>
+
+<div th:replace="~{fragments/chat :: chat}"></div>
+
+<footer class="footer text-center py-3">
+  <div class="container">
+    <span>&copy; 2025 Blogio. All rights reserved.</span>
+  </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function(){
+    var quillBio = new Quill('#bioEditor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'color': [] }, { 'background': [] }],
+          [{ 'header': '1'}, { 'header': '2'}, 'blockquote', 'code-block' ],
+          [{ 'list': 'ordered'}, { 'list': 'bullet'}, { 'indent': '-1'}, { 'indent': '+1' }],
+          ['link', 'image', 'video'],
+          ['clean']
+        ]
+      }
+    });
+
+    quillBio.root.innerHTML = /*[[${profile.bio}]]*/ '';
+
+    var form = document.getElementById('editProfileForm');
+    form.onsubmit = function() {
+      document.getElementById('bioHtmlContent').value = quillBio.root.innerHTML;
+    };
+  });
+</script>
+
+</body>
+</html>

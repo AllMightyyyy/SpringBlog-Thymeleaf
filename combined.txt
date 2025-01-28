@@ -1,0 +1,2927 @@
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\BlogApplication.java -----
+package com.example.blog;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BlogApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(BlogApplication.class, args);
+    }
+
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\AdminInitializer.java -----
+package com.example.blog.config;
+
+import com.example.blog.model.Role;
+import com.example.blog.model.User;
+import com.example.blog.repository.RoleRepository;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+import java.util.Set;
+
+@Component
+public class AdminInitializer implements CommandLineRunner {
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Value("${admin.initial.email}")
+    private String adminEmail;
+
+    @Value("${admin.initial.password}")
+    private String adminInitialPassword;
+
+    @Override
+    public void run(String... args) throws Exception {
+        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                .orElseThrow(() -> new RuntimeException("ROLE_ADMIN not found"));
+
+        if (!userRepository.existsByEmail(adminEmail)) {
+            User admin = User.builder()
+                    .email(adminEmail)
+                    .password(passwordEncoder.encode(adminInitialPassword))
+                    .name("Administrator")
+                    .roles(Set.of(adminRole))
+                    .build();
+            userRepository.save(admin);
+            System.out.println("Admin user created: " + adminEmail + " / [PROTECTED]");
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\DataInitializer.java -----
+package com.example.blog.config;
+
+import com.example.blog.model.Role;
+import com.example.blog.model.Room;
+import com.example.blog.repository.RoleRepository;
+import com.example.blog.service.RoomService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+
+    private final RoomService roomService;
+    @Autowired
+    private RoleRepository roleRepository;
+
+    public DataInitializer(RoomService roomService){
+        this.roomService = roomService;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        if (!roleRepository.findByName("ROLE_USER").isPresent()) {
+            roleRepository.save(Role.builder().name("ROLE_USER").build());
+        }
+        if (!roleRepository.findByName("ROLE_ADMIN").isPresent()) {
+            roleRepository.save(Role.builder().name("ROLE_ADMIN").build());
+        }
+        if(roomService.findAllRooms().isEmpty()){
+            roomService.createRoom("sports", "Discuss all things sports");
+            roomService.createRoom("technology", "Talk about the latest in tech");
+            roomService.createRoom("finance", "Finance and investment discussions");
+            roomService.createRoom("programming", "Share programming knowledge");
+            roomService.createRoom("school", "School-related topics");
+            roomService.createRoom("music", "Music discussions");
+            roomService.createRoom("films", "Film and cinema talk");
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\MethodSecurityConfig.java -----
+package com.example.blog.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
+@Configuration
+@EnableMethodSecurity
+public class MethodSecurityConfig {
+    // Enables method-level security annotations
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\SecurityConfig.java -----
+package com.example.blog.config;
+
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Configuration
+public class SecurityConfig {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return email -> {
+            com.example.blog.model.User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            Set<SimpleGrantedAuthority> authorities = user.getRoles().stream()
+                    .map(role -> new SimpleGrantedAuthority(role.getName()))
+                    .collect(Collectors.toSet());
+            return new org.springframework.security.core.userdetails.User(
+                    user.getEmail(),
+                    user.getPassword(),
+                    authorities
+            );
+        };
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/register", "/login", "/css/**","/profile-images/**", "/tags/**", "/uploads/**", "/*.map", "/ws/**").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/posts/create", "/posts/*/edit", "/profiles/me/**").hasRole("USER")
+                        .anyRequest().authenticated()
+                )
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/", true)
+                        .permitAll()
+                )
+                .logout(LogoutConfigurer::permitAll)
+                .exceptionHandling(exception -> exception
+                        .accessDeniedPage("/access-denied")
+                )
+                .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\ThymeleafGlobalAttributes.java -----
+package com.yourpackage.config;
+
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ModelAttribute;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+@ControllerAdvice
+public class ThymeleafGlobalAttributes {
+
+    @ModelAttribute
+    public void addCsrf(Model model, HttpServletRequest request) {
+        CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (csrfToken != null) {
+            model.addAttribute("_csrf", csrfToken);
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\WebConfig.java -----
+package com.example.blog.config;
+
+import com.example.blog.interceptor.ThemeInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
+    @Autowired
+    private ThemeInterceptor themeInterceptor;
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry
+                .addResourceHandler("/uploads/**")
+                .addResourceLocations("file:" + uploadDir + "/");
+
+        registry
+                .addResourceHandler("/*.map")
+                .addResourceLocations("classpath:/static/");
+        registry
+                .addResourceHandler("/profile-images/**")
+                .addResourceLocations("file:" + uploadDir + "/profile-images/");
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(themeInterceptor).addPathPatterns("/**");
+    }
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("home");
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\config\WebSocketConfig.java -----
+package com.example.blog.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.*;
+
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // Endpoint for WebSocket connections
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.setApplicationDestinationPrefixes("/app");
+
+        config.enableSimpleBroker("/topic", "/queue");
+
+        config.setUserDestinationPrefix("/user");
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\AccessDeniedController.java -----
+package com.yourpackage.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class AccessDeniedController {
+
+    @GetMapping("/access-denied")
+    public String accessDenied() {
+        return "access-denied";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\AdminController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Comment;
+import com.example.blog.model.Post;
+import com.example.blog.service.CommentService;
+import com.example.blog.service.EmailService;
+import com.example.blog.service.PostService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.List;
+
+@Controller
+@RequestMapping("/admin")
+public class AdminController {
+
+    private final PostService postService;
+    private final CommentService commentService;
+    private final EmailService emailService;
+
+    @Autowired
+    public AdminController(PostService postService, CommentService commentService, EmailService emailService) {
+        this.postService = postService;
+        this.commentService = commentService;
+        this.emailService = emailService;
+    }
+
+    /**
+     * View all reported posts
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/reports/posts")
+    public String viewReportedPosts(Model model) {
+        List<Post> reportedPosts = postService.findReportedPosts();
+        model.addAttribute("reportedPosts", reportedPosts);
+        return "admin/reported_posts";
+    }
+
+    /**
+     * View all reported comments
+     */
+    @GetMapping("/reports/comments")
+    public String viewReportedComments(Model model) {
+        List<Comment> reportedComments = commentService.findReportedComments();
+        model.addAttribute("reportedComments", reportedComments);
+        return "admin/reported_comments";
+    }
+
+    /**
+     * Delete any post
+     */
+    @PostMapping("/posts/{id}/delete")
+    public String deletePost(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        String postOwnerEmail = post.getAuthor().getEmail();
+
+        postService.deleteById(id);
+        emailService.sendNotificationToUser(
+                postOwnerEmail,
+                "Your post has been deleted",
+                "Your post titled \"" + post.getTitle() + "\" has been deleted by the administrator."
+        );
+
+        redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
+        return "redirect:/admin/reports/posts";
+    }
+
+    /**
+     * Delete any comment
+     */
+    @PostMapping("/comments/{id}/delete")
+    public String deleteComment(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        Comment comment = commentService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid comment Id:" + id));
+
+        commentService.deleteById(id);
+        emailService.sendNotificationToAdmin(
+                "Comment Deleted by Admin",
+                "A comment by \"" + comment.getUser().getName() + "\" has been deleted by the administrator."
+        );
+
+        redirectAttributes.addFlashAttribute("success", "Comment deleted successfully!");
+        return "redirect:/admin/reports/comments";
+    }
+
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\AuthController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.User;
+import com.example.blog.service.UserService;
+import com.example.blog.service.UserProfileService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller
+public class AuthController {
+
+    private final UserService userService;
+    private final UserProfileService userProfileService;
+
+    @Autowired
+    public AuthController(UserService userService, UserProfileService userProfileService){
+        this.userService = userService;
+        this.userProfileService = userProfileService;
+    }
+
+    @GetMapping("/register")
+    public String showRegistrationForm(Model model){
+        model.addAttribute("user", new User());
+        return "register";
+    }
+
+    @PostMapping("/register")
+    public String registerUser(@Valid @ModelAttribute("user") User user,
+                               BindingResult result,
+                               Model model,
+                               RedirectAttributes redirectAttributes){
+        if(result.hasErrors()){
+            return "register";
+        }
+        if(userService.findByEmail(user.getEmail()).isPresent()){
+            model.addAttribute("error", "Email already registered");
+            return "register";
+        }
+        userService.registerUser(user);
+        userProfileService.createUserProfile(user, user.getName());
+        redirectAttributes.addFlashAttribute("success", "Registration successful! Please login.");
+        return "redirect:/login";
+    }
+
+    @GetMapping("/login")
+    public String showLoginForm(){
+        return "login";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\BaseController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.User;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ModelAttribute;
+
+@ControllerAdvice
+public class BaseController {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @ModelAttribute
+    public void addUserAttributes(Authentication authentication, Model model){
+        if(authentication != null && authentication.isAuthenticated()){
+            String email = authentication.getName();
+            User user = userRepository.findByEmail(email).orElse(null);
+            if(user != null && user.getUserProfile() != null){
+                model.addAttribute("displayName", user.getUserProfile().getDisplayName());
+            } else {
+                model.addAttribute("displayName", "Anonymous");
+            }
+        } else {
+            model.addAttribute("displayName", "Anonymous");
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\ChatController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.ChatMessage;
+import com.example.blog.model.MessageType;
+import com.example.blog.model.User;
+import com.example.blog.repository.UserRepository;
+import org.springframework.messaging.handler.annotation.*;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Controller;
+
+import java.security.Principal;
+
+@Controller
+public class ChatController {
+
+    private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
+
+    public ChatController(SimpMessagingTemplate messagingTemplate, UserRepository userRepository) {
+        this.messagingTemplate = messagingTemplate;
+        this.userRepository = userRepository;
+    }
+
+    @MessageMapping("/chat.sendMessage")
+    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal) {
+        // Get the authenticated user's display name
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String displayName = user.getUserProfile() != null ?
+                user.getUserProfile().getDisplayName() : email;
+
+        // Set the correct sender name
+        chatMessage.setSender(displayName);
+
+        if (chatMessage.getRoom() != null && !chatMessage.getRoom().trim().isEmpty()) {
+            messagingTemplate.convertAndSend("/topic/" + chatMessage.getRoom(), chatMessage);
+        } else if (chatMessage.getRecipient() != null && !chatMessage.getRecipient().trim().isEmpty()) {
+            messagingTemplate.convertAndSendToUser(chatMessage.getRecipient(), "/queue/messages", chatMessage);
+        } else {
+            messagingTemplate.convertAndSend("/topic/global", chatMessage);
+        }
+    }
+
+    @MessageMapping("/chat.addUser")
+    public void addUser(@Payload ChatMessage chatMessage,
+                        @Header("simpSessionId") String sessionId,
+                        Principal principal) {
+        // Get the authenticated user's display name
+        String email = principal.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String displayName = user.getUserProfile() != null ?
+                user.getUserProfile().getDisplayName() : email;
+
+        chatMessage.setType(MessageType.JOIN);
+        chatMessage.setSender(displayName);  // Set the correct sender name
+
+        if (chatMessage.getRoom() != null && !chatMessage.getRoom().trim().isEmpty()) {
+            messagingTemplate.convertAndSend("/topic/" + chatMessage.getRoom(), chatMessage);
+        } else {
+            messagingTemplate.convertAndSend("/topic/global", chatMessage);
+        }
+    }
+
+    @MessageMapping("/chat.removeUser")
+    public void removeUser(@Payload ChatMessage chatMessage){
+        chatMessage.setType(MessageType.LEAVE);
+        if(chatMessage.getRoom() != null){
+            messagingTemplate.convertAndSend("/topic/" + chatMessage.getRoom(), chatMessage);
+        } else {
+            messagingTemplate.convertAndSend("/topic/global", chatMessage);
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\ChatPageController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Room;
+import com.example.blog.service.RoomService;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+@Controller
+public class ChatPageController {
+
+    private final RoomService roomService;
+    private final UserRepository userRepository;
+
+    @Autowired
+    public ChatPageController(RoomService roomService, UserRepository userRepository) {
+        this.roomService = roomService;
+        this.userRepository = userRepository;
+    }
+
+    @GetMapping("/chat/global")
+    public String globalChat(Model model, Authentication authentication) {
+        addDisplayNameToModel(model, authentication);
+        return "global_chat";
+    }
+
+    @GetMapping("/chat/room/{roomName}")
+    public String roomChat(@PathVariable String roomName, Model model, Authentication authentication) {
+        Room room = roomService.findByName(roomName)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid room name: " + roomName));
+        model.addAttribute("roomName", room.getName());
+        addDisplayNameToModel(model, authentication);
+        return "room_chat";
+    }
+
+    @GetMapping("/chat/private/{username}")
+    public String privateChat(@PathVariable String username, Model model, Authentication authentication) {
+        model.addAttribute("recipientName", username);
+        model.addAttribute("recipientUsername", username);
+        // Add displayName to the model
+        addDisplayNameToModel(model, authentication);
+        return "private_chat";
+    }
+
+    @GetMapping("/chat")
+    public String chatHome(Model model, Authentication authentication) {
+        model.addAttribute("rooms", roomService.findAllRooms());
+        // Add displayName to the model
+        addDisplayNameToModel(model, authentication);
+        return "chat_home";
+    }
+
+    private void addDisplayNameToModel(Model model, Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            String email = authentication.getName();
+            userRepository.findByEmail(email).ifPresent(user -> {
+                String displayName = user.getUserProfile() != null ?
+                        user.getUserProfile().getDisplayName() : "Anonymous";
+                model.addAttribute("displayName", displayName);
+            });
+        } else {
+            model.addAttribute("displayName", "Anonymous");
+        }
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\CommentController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Comment;
+import com.example.blog.model.Post;
+import com.example.blog.model.User;
+import com.example.blog.service.CommentService;
+import com.example.blog.service.ContentFilterService;
+import com.example.blog.service.EmailService;
+import com.example.blog.service.PostService;
+import com.example.blog.repository.UserRepository;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import jakarta.transaction.Transactional;
+import java.time.LocalDateTime;
+
+@Controller
+public class CommentController {
+
+    private final CommentService commentService;
+    private final PostService postService;
+    private final UserRepository userRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private ContentFilterService contentFilterService;
+
+    @Autowired
+    public CommentController(CommentService commentService,
+                             PostService postService,
+                             UserRepository userRepository) {
+        this.commentService = commentService;
+        this.postService = postService;
+        this.userRepository = userRepository;
+    }
+
+    @PostMapping("/posts/{id}/comments")
+    @Transactional
+    public String addComment(@PathVariable Long id,
+                             @RequestParam String content,
+                             @RequestParam(required = false) Long parentId,
+                             Authentication authentication,
+                             RedirectAttributes redirectAttributes) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        String sanitizedContent = Jsoup.clean(content, Safelist.basicWithImages());
+
+
+        Comment comment = Comment.builder()
+                .content(sanitizedContent)
+                .createdAt(LocalDateTime.now())
+                .user(user)
+                .post(post)
+                .build();
+
+        comment.setContent(sanitizedContent);
+
+        if (!contentFilterService.isContentSafe(comment.getContent())) {
+            comment.setReported(true);
+            comment.setReportCount(comment.getReportCount() + 1);
+            emailService.sendNotificationToAdmin(
+                    "Potentially Harmful Comment Detected",
+                    "A comment by " + user.getName() + " on post ID " + post.getId() + " contains potentially harmful content and has been flagged for review."
+            );
+            redirectAttributes.addFlashAttribute("error", "Your comment contains inappropriate content and cannot be posted.");
+            return "redirect:/posts/" + id;
+        }
+
+        emailService.sendNotificationToAdmin(
+                "New Comment Added",
+                "A new comment has been added to post ID " + post.getId() + " by " + user.getName() + " (" + user.getEmail() + ")."
+        );
+
+        if (parentId != null) {
+            Comment parentComment = commentService.findById(parentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Parent comment not found"));
+            parentComment.addReply(comment);
+            commentService.save(parentComment);
+        } else {
+            post.addComment(comment);
+            postService.save(post);
+        }
+
+        redirectAttributes.addFlashAttribute("success", "Comment added successfully!");
+        return "redirect:/posts/" + id;
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\PostController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.*;
+import com.example.blog.service.*;
+import com.example.blog.repository.UserRepository;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import jakarta.transaction.Transactional;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Controller
+public class PostController {
+
+    private final PostService postService;
+    private final ReactionService reactionService;
+    private final TagService tagService;
+    private final UserRepository userRepository;
+    private final SubscriptionService subscriptionService;
+    private final CommentService commentService;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private ContentFilterService contentFilterService;
+
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
+    private final Parser markdownParser;
+    private final HtmlRenderer htmlRenderer;
+
+    @Autowired
+    public PostController(PostService postService,
+                          ReactionService reactionService,
+                          TagService tagService,
+                          UserRepository userRepository,
+                          SubscriptionService subscriptionService,
+                          CommentService commentService) {
+        this.postService = postService;
+        this.reactionService = reactionService;
+        this.tagService = tagService;
+        this.userRepository = userRepository;
+        this.subscriptionService = subscriptionService;
+        this.commentService = commentService;
+
+        this.markdownParser = Parser.builder().build();
+        this.htmlRenderer = HtmlRenderer.builder().build();
+    }
+
+    @GetMapping("/")
+    public String home(Model model) {
+        List<Post> posts = postService.findAll();
+        model.addAttribute("posts", posts);
+        return "home";
+    }
+
+    @GetMapping("/my-posts")
+    public String myPosts(Model model, Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        List<Post> posts = postService.findByAuthor(user);
+        model.addAttribute("posts", posts);
+        return "my_posts";
+    }
+
+    @PostMapping("/posts/{id}/delete")
+    @Transactional
+    public String deletePost(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+        String email = authentication.getName();
+        if (!post.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to delete this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        if (post.getImagePath() != null) {
+            File imageFile = new File(uploadDir, post.getImagePath().replace("/uploads/", ""));
+            if (imageFile.exists()) {
+                imageFile.delete();
+            }
+        }
+
+        for (Subscription sub : new HashSet<>(post.getSubscriptions())) {
+            post.removeSubscription(sub);
+        }
+
+        postService.deleteById(id);
+        redirectAttributes.addFlashAttribute("success", "Post deleted successfully!");
+        return "redirect:/my-posts";
+    }
+
+    @GetMapping("/posts/create")
+    public String showCreatePostForm(Model model) {
+        model.addAttribute("post", new Post());
+        return "create_post";
+    }
+
+    @PostMapping("/posts/create")
+    @Transactional
+    public String createPost(@ModelAttribute Post post,
+                             @RequestParam(value = "tagsInput", required = false) String tagsInput,
+                             @RequestParam("imageFile") MultipartFile imageFile,
+                             Authentication authentication,
+                             RedirectAttributes redirectAttributes) {
+
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        post.setAuthor(user);
+        post.setCreatedAt(LocalDateTime.now());
+
+        String sanitizedContent = Jsoup.clean(post.getContent(), Safelist.basicWithImages());
+        post.setContent(sanitizedContent);
+
+        // Auto-flagging check
+        if (!contentFilterService.isContentSafe(post.getContent())) {
+            post.setReported(true);
+            post.setReportCount(post.getReportCount() + 1);
+            emailService.sendNotificationToAdmin(
+                    "Potentially Harmful Post Detected",
+                    "A post titled \"" + post.getTitle() + "\" contains potentially harmful content and has been flagged for review."
+            );
+            redirectAttributes.addFlashAttribute("error", "Your post contains inappropriate content and cannot be published.");
+            return "redirect:/posts/create";
+        }
+
+        if (!imageFile.isEmpty()) {
+            try {
+                File uploadFolder = new File(uploadDir);
+                if (!uploadFolder.exists()) {
+                    uploadFolder.mkdirs();
+                }
+
+                String originalFilename = imageFile.getOriginalFilename();
+                String extension = "";
+                if (originalFilename != null && originalFilename.contains(".")) {
+                    extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+                }
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+                File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
+                imageFile.transferTo(destinationFile);
+
+                post.setImagePath("/uploads/" + uniqueFilename);
+            } catch (IOException e) {
+                e.printStackTrace();
+                redirectAttributes.addFlashAttribute("error", "Failed to upload image.");
+                return "redirect:/posts/create";
+            }
+        }
+
+        if (tagsInput != null && !tagsInput.trim().isEmpty()) {
+            String[] tagNames = tagsInput.split(",");
+            Set<Tag> tagSet = new HashSet<>();
+            for (String tagName : tagNames) {
+                tagName = tagName.trim();
+                if (!tagName.isEmpty()) {
+                    Tag tag = tagService.findOrCreateTag(tagName);
+                    tagSet.add(tag);
+                    post.addTag(tag);
+                }
+            }
+            post.setTags(tagSet);
+        }
+
+        postService.save(post);
+        redirectAttributes.addFlashAttribute("success", "Post created successfully!");
+        return "redirect:/";
+    }
+
+    @GetMapping("/posts/{id}")
+    @Transactional
+    public String viewPost(@PathVariable Long id,
+                           Model model,
+                           @RequestParam(value = "error", required = false) String error,
+                           Authentication authentication) {
+
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        long likeCount = reactionService.countByPostAndType(post, "LIKE");
+        long dislikeCount = reactionService.countByPostAndType(post, "DISLIKE");
+
+        String renderedContent = htmlRenderer.render(markdownParser.parse(post.getContent()));
+
+        List<Comment> topLevelComments = commentService.findTopLevelCommentsByPostId(id);
+
+        model.addAttribute("post", post);
+        model.addAttribute("comments", topLevelComments);
+        model.addAttribute("likeCount", likeCount);
+        model.addAttribute("dislikeCount", dislikeCount);
+        model.addAttribute("error", error);
+        model.addAttribute("renderedContent", renderedContent);
+
+        if (authentication != null && authentication.isAuthenticated()) {
+            String email = authentication.getName();
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user != null) {
+                boolean isSubscribed = subscriptionService.isSubscribed(user, post);
+                model.addAttribute("isSubscribed", isSubscribed);
+            }
+        }
+        return "view_post";
+    }
+
+    @PostMapping("/posts/{id}/react")
+    @Transactional
+    public String reactToPost(@PathVariable Long id,
+                              @RequestParam String type,
+                              Authentication authentication,
+                              RedirectAttributes redirectAttributes) {
+
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        Optional<Reaction> existingReaction = reactionService.findByUserAndPost(user, post);
+        if (existingReaction.isPresent()) {
+            Reaction reaction = existingReaction.get();
+            reaction.setType(type);
+            reactionService.save(reaction);
+        } else {
+            Reaction reaction = Reaction.builder()
+                    .user(user)
+                    .post(post)
+                    .type(type)
+                    .build();
+            reactionService.save(reaction);
+        }
+
+        redirectAttributes.addFlashAttribute("success", "Your reaction has been recorded.");
+        return "redirect:/posts/" + id;
+    }
+
+    @GetMapping("/posts/{id}/edit")
+    @Transactional
+    public String showEditPostForm(@PathVariable Long id,
+                                   Model model,
+                                   Authentication authentication,
+                                   RedirectAttributes redirectAttributes) {
+
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        String email = authentication.getName();
+        if (!post.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        model.addAttribute("post", post);
+
+        String tags = String.join(", ",
+                post.getTags().stream().map(Tag::getName).toArray(String[]::new));
+        model.addAttribute("tagsInput", tags);
+
+        return "edit_post";
+    }
+
+    @PostMapping("/posts/{id}/edit")
+    @Transactional
+    public String editPost(@PathVariable Long id,
+                           @ModelAttribute Post updatedPost,
+                           @RequestParam(value = "tagsInput", required = false) String tagsInput,
+                           @RequestParam("imageFile") MultipartFile imageFile,
+                           Authentication authentication,
+                           RedirectAttributes redirectAttributes) {
+
+        Post existingPost = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+
+        String email = authentication.getName();
+        if (!existingPost.getAuthor().getEmail().equals(email)) {
+            redirectAttributes.addFlashAttribute("error", "You are not authorized to edit this post.");
+            return "redirect:/posts/" + id;
+        }
+
+        existingPost.setTitle(updatedPost.getTitle());
+        existingPost.setContent(updatedPost.getContent());
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            try {
+                File uploadFolder = new File(uploadDir);
+                if (!uploadFolder.exists()) {
+                    uploadFolder.mkdirs();
+                }
+
+                String originalFilename = imageFile.getOriginalFilename();
+                String extension = "";
+                if (originalFilename != null && originalFilename.contains(".")) {
+                    extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+                }
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+                File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
+                imageFile.transferTo(destinationFile);
+
+                if (existingPost.getImagePath() != null) {
+                    String oldImageName = existingPost.getImagePath().replace("/uploads/", "");
+                    File oldImage = new File(uploadDir, oldImageName);
+                    if (oldImage.exists()) {
+                        oldImage.delete();
+                    }
+                }
+
+                existingPost.setImagePath("/uploads/" + uniqueFilename);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                redirectAttributes.addFlashAttribute("error", "Failed to upload new image.");
+                return "redirect:/posts/" + id + "/edit";
+            }
+        }
+
+        if (tagsInput != null && !tagsInput.trim().isEmpty()) {
+            String[] tagNames = tagsInput.split(",");
+            Set<Tag> newTagSet = new HashSet<>();
+            for (String tagName : tagNames) {
+                tagName = tagName.trim();
+                if (!tagName.isEmpty()) {
+                    Tag tag = tagService.findOrCreateTag(tagName);
+                    newTagSet.add(tag);
+                }
+            }
+
+            Set<Tag> tagsToRemove = new HashSet<>(existingPost.getTags());
+            tagsToRemove.removeAll(newTagSet);
+            for (Tag tag : tagsToRemove) {
+                existingPost.removeTag(tag);
+            }
+
+            for (Tag tag : newTagSet) {
+                existingPost.addTag(tag);
+            }
+        } else {
+            for (Tag tag : new HashSet<>(existingPost.getTags())) {
+                existingPost.removeTag(tag);
+            }
+        }
+
+        try {
+            postService.save(existingPost);
+            redirectAttributes.addFlashAttribute("success", "Post updated successfully!");
+        } catch (Exception e) {
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("error", "An error occurred while updating the post.");
+        }
+
+        return "redirect:/posts/" + id;
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\ReportController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Comment;
+import com.example.blog.model.Post;
+import com.example.blog.service.CommentService;
+import com.example.blog.service.EmailService;
+import com.example.blog.service.PostService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller
+@RequestMapping("/report")
+public class ReportController {
+
+    @Autowired
+    private PostService postService;
+
+    @Autowired
+    private CommentService commentService;
+
+    @Autowired
+    private EmailService emailService;
+
+    /**
+     * Report a post
+     */
+    @PostMapping("/post/{id}")
+    public String reportPost(@PathVariable Long id, @RequestParam String reason, RedirectAttributes redirectAttributes) {
+        Post post = postService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id:" + id));
+        post.setReportCount(post.getReportCount() + 1);
+        if (post.getReportCount() >= 5) { // Threshold for auto-reporting
+            post.setReported(true);
+            emailService.sendNotificationToAdmin(
+                    "Post Automatically Reported",
+                    "Post ID " + id + " has been reported " + post.getReportCount() + " times and has been flagged for review."
+            );
+        }
+        postService.save(post);
+        redirectAttributes.addFlashAttribute("success", "Post reported successfully!");
+        return "redirect:/posts/" + id;
+    }
+
+    /**
+     * Report a comment
+     */
+    @PostMapping("/comment/{id}")
+    public String reportComment(@PathVariable Long id, @RequestParam String reason, RedirectAttributes redirectAttributes) {
+        Comment comment = commentService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid comment Id:" + id));
+        comment.setReportCount(comment.getReportCount() + 1);
+        if (comment.getReportCount() >= 3) { // Threshold for auto-reporting
+            comment.setReported(true);
+            emailService.sendNotificationToAdmin(
+                    "Comment Automatically Reported",
+                    "Comment ID " + id + " has been reported " + comment.getReportCount() + " times and has been flagged for review."
+            );
+        }
+        commentService.save(comment);
+        redirectAttributes.addFlashAttribute("success", "Comment reported successfully!");
+        return "redirect:/posts/" + comment.getPost().getId();
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\SearchController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Post;
+import com.example.blog.service.PostService;
+import com.example.blog.service.TagService;
+import com.example.blog.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+
+@Controller
+@RequestMapping("/search")
+public class SearchController {
+
+    private final PostService postService;
+    private final TagService tagService;
+    private final UserService userService;
+
+    @Autowired
+    public SearchController(PostService postService, TagService tagService, UserService userService) {
+        this.postService = postService;
+        this.tagService = tagService;
+        this.userService = userService;
+    }
+
+    /**
+     * Display the search form.
+     */
+    @GetMapping
+    public String showSearchForm(Model model) {
+        model.addAttribute("tags", tagService.findAll());
+        return "search";
+    }
+
+    /**
+     * Handle search requests and display results with pagination.
+     */
+    @GetMapping("/results")
+    public String searchPosts(
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "tag", required = false) String tag,
+            @RequestParam(value = "authorEmail", required = false) String authorEmail,
+            @RequestParam(value = "authorName", required = false) String authorName,
+            @RequestParam(value = "createdAfter", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAfter,
+            @RequestParam(value = "createdBefore", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdBefore,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            Model model
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> postPage = postService.searchPosts(title, tag, authorEmail, authorName, createdAfter, createdBefore, pageable);
+
+        model.addAttribute("title", title);
+        model.addAttribute("tag", tag);
+        model.addAttribute("authorEmail", authorEmail);
+        model.addAttribute("authorName", authorName);
+        model.addAttribute("createdAfter", createdAfter);
+        model.addAttribute("createdBefore", createdBefore);
+
+        model.addAttribute("postPage", postPage);
+        return "search_results";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\SubscriptionController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.User;
+import com.example.blog.service.PostService;
+import com.example.blog.service.SubscriptionService;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller
+@RequestMapping("/subscriptions")
+public class SubscriptionController {
+
+    private final SubscriptionService subscriptionService;
+    private final PostService postService;
+    private final UserRepository userRepository;
+
+    @Autowired
+    public SubscriptionController(SubscriptionService subscriptionService,
+                                  PostService postService,
+                                  UserRepository userRepository) {
+        this.subscriptionService = subscriptionService;
+        this.postService = postService;
+        this.userRepository = userRepository;
+    }
+
+    @PostMapping("/subscribe/{postId}")
+    public String subscribe(@PathVariable Long postId, Authentication auth, RedirectAttributes redirectAttributes) {
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id: " + postId));
+
+        subscriptionService.subscribe(user, post);
+        redirectAttributes.addFlashAttribute("success", "Subscribed to post successfully!");
+        return "redirect:/posts/" + postId;
+    }
+
+    @PostMapping("/unsubscribe/{postId}")
+    public String unsubscribe(@PathVariable Long postId, Authentication auth, RedirectAttributes redirectAttributes) {
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Post post = postService.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid post Id: " + postId));
+
+        subscriptionService.unsubscribe(user, post);
+        redirectAttributes.addFlashAttribute("success", "Unsubscribed from post successfully!");
+        return "redirect:/posts/" + postId;
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\TagController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.Tag;
+import com.example.blog.service.TagService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+public class TagController {
+
+    private final TagService tagService;
+
+    @Autowired
+    public TagController(TagService tagService) {
+        this.tagService = tagService;
+    }
+
+    @GetMapping("/tags")
+    public String showAllTags(Model model) {
+        model.addAttribute("tags", tagService.findAll());
+        return "tags_list";
+    }
+
+    @GetMapping("/tags/{id}")
+    @Transactional
+    public String showPostsByTag(@PathVariable Long id, Model model) {
+        Tag tag = tagService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid tag ID: " + id));
+        model.addAttribute("tag", tag);
+        model.addAttribute("posts", tag.getPosts());
+        return "tag_posts";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\ThemeController.java -----
+package com.example.blog.controller;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@Controller
+public class ThemeController {
+
+    @GetMapping("/theme")
+    public String setTheme(@RequestParam("theme") String theme, HttpServletRequest request, HttpServletResponse response) {
+        // Validate the theme parameter
+        if (!theme.equals("dark") && !theme.equals("light") &&
+                !theme.equals("material") && !theme.equals("material-space")) {
+            theme = "dark"; // default theme
+        }
+
+        // Create a cookie to store the theme preference, valid for 30 days
+        Cookie themeCookie = new Cookie("theme", theme);
+        themeCookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
+        themeCookie.setPath("/");
+        response.addCookie(themeCookie);
+
+        // Redirect back to the referring page or home if not available
+        String referer = request.getHeader("Referer");
+        if (referer != null && !referer.isEmpty() && referer.startsWith(request.getScheme() + "://" + request.getServerName())) {
+            return "redirect:" + referer;
+        }
+        return "redirect:/";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\controller\UserProfileController.java -----
+package com.example.blog.controller;
+
+import com.example.blog.model.User;
+import com.example.blog.model.UserProfile;
+import com.example.blog.service.UserProfileService;
+import com.example.blog.service.UserService;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import jakarta.validation.Valid;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+@Controller
+@RequestMapping("/profiles")
+public class UserProfileController {
+
+    private final UserProfileService userProfileService;
+    private final UserService userService;
+
+    @Autowired
+    public UserProfileController(UserProfileService userProfileService, UserService userService){
+        this.userProfileService = userProfileService;
+        this.userService = userService;
+    }
+
+    /**
+     * View own profile
+     */
+    @GetMapping("/me")
+    public String viewOwnProfile(Authentication authentication, Model model){
+        String email = authentication.getName();
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UserProfile profile = userProfileService.findByUser(user)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+
+        model.addAttribute("profile", profile);
+        return "view_own_profile";
+    }
+
+    /**
+     * Edit own profile
+     */
+    @GetMapping("/me/edit")
+    public String editOwnProfile(Authentication authentication, Model model){
+        String email = authentication.getName();
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UserProfile profile = userProfileService.findByUser(user)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+        model.addAttribute("profile", profile);
+        return "edit_own_profile";
+    }
+
+    @PostMapping("/me/edit")
+    public String updateOwnProfile(@Valid @ModelAttribute("profile") UserProfile profile,
+                                   BindingResult result,
+                                   @RequestParam(value = "profileImage", required = false) MultipartFile profileImage,
+                                   @RequestParam(value = "twitterUrl", required = false) String twitterUrl,
+                                   @RequestParam(value = "facebookUrl", required = false) String facebookUrl,
+                                   @RequestParam(value = "linkedinUrl", required = false) String linkedinUrl,
+                                   @RequestParam(value = "githubUrl", required = false) String githubUrl,
+                                   @RequestParam(value = "instagramUrl", required = false) String instagramUrl,
+                                   @RequestParam(value = "bioHtmlContent", required = false) String bioHtmlContent,
+                                   Authentication authentication,
+                                   RedirectAttributes redirectAttributes){
+        if(result.hasErrors()){
+            return "edit_own_profile";
+        }
+
+        User user = userService.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UserProfile existingProfile = userProfileService.findByUser(user)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+
+        existingProfile.setDisplayName(profile.getDisplayName());
+
+        String sanitizedBio = sanitizeHtml(bioHtmlContent);
+        existingProfile.setBio(sanitizedBio);
+
+        existingProfile.setIsPublic(profile.getIsPublic());
+
+        existingProfile.setTwitterUrl(twitterUrl);
+        existingProfile.setFacebookUrl(facebookUrl);
+        existingProfile.setLinkedinUrl(linkedinUrl);
+        existingProfile.setGithubUrl(githubUrl);
+        existingProfile.setInstagramUrl(instagramUrl);
+
+        try {
+            userProfileService.updateUserProfile(existingProfile, profileImage);
+        } catch (IOException e) {
+            e.printStackTrace();
+            redirectAttributes.addFlashAttribute("error", "Failed to upload profile image.");
+            return "redirect:/profiles/me/edit";
+        }
+
+        redirectAttributes.addFlashAttribute("success", "Profile updated successfully!");
+        return "redirect:/profiles/me";
+    }
+
+    /**
+     * View other users' profiles
+     */
+    @GetMapping("/{userId}")
+    public String viewUserProfile(@PathVariable Long userId,
+                                  Authentication authentication,
+                                  Model model,
+                                  RedirectAttributes redirectAttributes){
+        User user = userService.findById(userId).orElse(null);
+        if(user == null){
+            redirectAttributes.addFlashAttribute("error", "User not found.");
+            return "redirect:/";
+        }
+
+        UserProfile profile = userProfileService.findByUser(user).orElse(null);
+        if(profile == null){
+            redirectAttributes.addFlashAttribute("error", "Profile not found.");
+            return "redirect:/";
+        }
+
+        if(!profile.getIsPublic()){
+            if(authentication == null || !authentication.getName().equals(profile.getUser().getEmail())){
+                redirectAttributes.addFlashAttribute("error", "This profile is private.");
+                return "redirect:/";
+            }
+        }
+
+        model.addAttribute("profile", profile);
+        return "view_user_profile";
+    }
+
+    /**
+     * Helper method to sanitize HTML using JSoup
+     */
+    private String sanitizeHtml(String htmlContent){
+        if(htmlContent == null){
+            return "";
+        }
+        Safelist safelist = Safelist.basicWithImages()
+                .addTags("h1", "h2", "h3", "h4", "h5", "h6")
+                .addAttributes("img", "src", "alt", "title")
+                .addAttributes("a", "href", "title", "target")
+                .addProtocols("a", "href", "http", "https", "mailto")
+                .addProtocols("img", "src", "http", "https");
+
+        return Jsoup.clean(htmlContent, safelist);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\exception\GlobalExceptionHandler.java -----
+package com.example.blog.exception;
+
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public String handleIllegalArgumentException(IllegalArgumentException ex, Model model){
+        model.addAttribute("errorMessage", ex.getMessage());
+        return "error";
+    }
+
+    @ExceptionHandler(Exception.class)
+    public String handleException(Exception ex, Model model){
+        model.addAttribute("errorMessage", "An unexpected error occurred.");
+        ex.printStackTrace();
+        return "error";
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\interceptor\ThemeInterceptor.java -----
+package com.example.blog.interceptor;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+@Component
+public class ThemeInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+
+        String theme = "dark"; // default theme
+
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("theme".equals(cookie.getName())) {
+                    theme = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        // Set the theme as a request attribute
+        request.setAttribute("theme", theme);
+
+        return true;
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\ChatMessage.java -----
+package com.example.blog.model;
+
+import lombok.*;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
+public class ChatMessage {
+    private MessageType type;
+    private String content;
+    private String sender;
+    private String recipient; // For private messages
+    private String room; // For room-based messages
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Comment.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "comments")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Comment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    private LocalDateTime createdAt;
+
+    private boolean reported = false;
+    private int reportCount = 0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    @ToString.Exclude
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    @ToString.Exclude
+    private Comment parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Comment> replies = new HashSet<>();
+
+    public void addReply(Comment reply) {
+        replies.add(reply);
+        reply.setParent(this);
+    }
+
+    public void removeReply(Comment reply) {
+        replies.remove(reply);
+        reply.setParent(null);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Message.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "messages")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Message {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String content;
+
+    private String sender;
+
+    private String recipient; // For private messages
+
+    private String room; // For room-based messages
+
+    private LocalDateTime timestamp;
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\MessageType.java -----
+package com.example.blog.model;
+
+public enum MessageType {
+    CHAT,
+    JOIN,
+    LEAVE
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Post.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "posts")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Post {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String content;
+
+    private LocalDateTime createdAt;
+
+    private String imagePath;
+
+    private boolean reported = false;
+    private int reportCount = 0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id")
+    @ToString.Exclude
+    private User author;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Comment> comments = new HashSet<>();
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Reaction> reactions = new HashSet<>();
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<Subscription> subscriptions = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "post_tags",
+            joinColumns = @JoinColumn(name = "post_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Tag> tags = new HashSet<>();
+
+    public void addComment(Comment comment) {
+        comments.add(comment);
+        comment.setPost(this);
+    }
+
+    public void removeComment(Comment comment) {
+        comments.remove(comment);
+        comment.setPost(null);
+    }
+
+    public void addTag(Tag tag) {
+        tags.add(tag);
+        tag.getPosts().add(this);
+    }
+
+    public void removeTag(Tag tag) {
+        tags.remove(tag);
+        tag.getPosts().remove(this);
+    }
+
+    public void addSubscription(Subscription subscription) {
+        subscriptions.add(subscription);
+        subscription.setPost(this);
+    }
+
+    public void removeSubscription(Subscription subscription) {
+        subscriptions.remove(subscription);
+        subscription.setPost(null);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Reaction.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "reactions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Reaction {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    private String type; // e.g., "LIKE", "DISLIKE"
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    @ToString.Exclude
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
+    private User user;
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Role.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "roles")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Role {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String name; // e.g., ROLE_USER, ROLE_ADMIN
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Room.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.Set;
+
+@Entity
+@Table(name = "rooms")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Room {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false)
+    private String name; // e.g., sports, technology
+
+    @Column(nullable = false)
+    private String description;
+
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Subscription.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "subscriptions", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Subscription {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
+    @ToString.Exclude
+    private Post post;
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\Tag.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "tags")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Tag {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    @ManyToMany(mappedBy = "tags")
+    @ToString.Exclude
+    @Builder.Default
+    private Set<Post> posts = new HashSet<>();
+
+    public void addPost(Post post) {
+        posts.add(post);
+        post.getTags().add(this);
+    }
+
+    public void removePost(Post post) {
+        posts.remove(post);
+        post.getTags().remove(this);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\User.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    private String name;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "users_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private Set<Post> posts = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private Set<Comment> comments = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private Set<Reaction> reactions = new HashSet<>();
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = false)
+    @ToString.Exclude
+    private UserProfile userProfile;
+
+    public void setUserProfile(UserProfile userProfile) {
+        this.userProfile = userProfile;
+        userProfile.setUser(this);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\model\UserProfile.java -----
+package com.example.blog.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "user_profiles")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class UserProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @ToString.Exclude
+    private User user;
+
+    private String displayName;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    private String profileImagePath;
+
+    private Boolean isPublic = true;
+
+    private LocalDateTime updatedAt;
+
+    private String twitterUrl;
+    private String facebookUrl;
+    private String linkedinUrl;
+    private String githubUrl;
+    private String instagramUrl;
+
+    /**
+     * Checks if any of the social URLs are present and have text.
+     *
+     * @return true if at least one social URL is non-null and not empty; false otherwise.
+     */
+    public boolean hasAnySocialUrl() {
+        return (twitterUrl != null && !twitterUrl.trim().isEmpty()) ||
+                (facebookUrl != null && !facebookUrl.trim().isEmpty()) ||
+                (linkedinUrl != null && !linkedinUrl.trim().isEmpty()) ||
+                (githubUrl != null && !githubUrl.trim().isEmpty()) ||
+                (instagramUrl != null && !instagramUrl.trim().isEmpty());
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\CommentRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Comment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface CommentRepository extends JpaRepository<Comment, Long> {
+
+    /**
+     * Finds all comments for a given post where the parent is null (top-level comments).
+     *
+     * @param postId The ID of the post.
+     * @return A list of top-level comments ordered by creation date ascending.
+     */
+    List<Comment> findByPostIdAndParentIsNullOrderByCreatedAtAsc(Long postId);
+    List<Comment> findByReportedTrue();
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\MessageRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Message;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface MessageRepository extends JpaRepository<Message, Long> {
+    List<Message> findByRoomOrderByTimestampAsc(String room);
+    List<Message> findByRecipientOrderByTimestampAsc(String recipient);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\PostRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.domain.Sort;
+
+import java.util.List;
+
+public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificationExecutor<Post> {
+    List<Post> findByAuthor(User author, Sort sort);
+    List<Post> findByReportedTrue();
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\ReactionRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Reaction;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface ReactionRepository extends JpaRepository<Reaction, Long> {
+    Optional<Reaction> findByUserAndPost(User user, Post post);
+
+    long countByPostAndType(Post post, String type);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\RoleRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Role;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface RoleRepository extends JpaRepository<Role, Long> {
+    Optional<Role> findByName(String name);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\RoomRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Room;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface RoomRepository extends JpaRepository<Room, Long> {
+    Optional<Room> findByName(String name);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\SubscriptionRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Subscription;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
+    Optional<Subscription> findByUserAndPost(User user, Post post);
+    List<Subscription> findByPost(Post post);
+    void deleteByPost(Post post);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\TagRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.Tag;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface TagRepository extends JpaRepository<Tag, Long> {
+    Optional<Tag> findByName(String name);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\UserProfileRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.UserProfile;
+import com.example.blog.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
+    Optional<UserProfile> findByUser(User user);
+    Optional<UserProfile> findByUserEmail(String email);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\repository\UserRepository.java -----
+package com.example.blog.repository;
+
+import com.example.blog.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+
+    boolean existsByEmail(String email);
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\CommentService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Comment;
+import com.example.blog.model.Post;
+import com.example.blog.repository.CommentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+
+    @Autowired
+    public CommentService(CommentRepository commentRepository){
+        this.commentRepository = commentRepository;
+    }
+
+    @Transactional
+    public Comment save(Comment comment){
+        return commentRepository.save(comment);
+    }
+
+    public Optional<Comment> findById(Long id){
+        return commentRepository.findById(id);
+    }
+
+    public void deleteById(Long id){
+        commentRepository.deleteById(id);
+    }
+
+    /**
+     * Fetches all top-level comments for a given post, ordered by creation time.
+     *
+     * @param postId The ID of the post.
+     * @return A list of top-level comments.
+     */
+    public List<Comment> findTopLevelCommentsByPostId(Long postId){
+        return commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtAsc(postId);
+    }
+
+    public List<Comment> findReportedComments() {
+        return commentRepository.findByReportedTrue();
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\ContentFilterService.java -----
+package com.example.blog.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ContentFilterService {
+
+    private final List<String> forbiddenKeywords;
+
+    @Autowired
+    public ContentFilterService(@Value("#{'${content.filter.forbidden-keywords}'.split(',')}") List<String> forbiddenKeywords){
+        this.forbiddenKeywords = forbiddenKeywords;
+    }
+
+    /**
+     * Checks if the content is safe based on forbidden keywords.
+     *
+     * @param content The content to check.
+     * @return True if content is safe, false otherwise.
+     */
+    public boolean isContentSafe(String content) {
+        if (content == null) return true;
+        String lowerContent = content.toLowerCase();
+        return forbiddenKeywords.stream().noneMatch(lowerContent::contains);
+    }
+
+    /**
+     * Retrieves the list of forbidden keywords.
+     *
+     * @return List of forbidden keywords.
+     */
+    public List<String> getForbiddenKeywords() {
+        return forbiddenKeywords;
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\EmailService.java -----
+package com.example.blog.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+import org.springframework.mail.MailException;
+
+@Service
+public class EmailService {
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    @Value("${app.admin.email}")
+    private String adminEmail;
+
+    /**
+     * Sends a notification email to the admin.
+     *
+     * @param subject The subject of the email.
+     * @param text    The body text of the email.
+     */
+    public void sendNotificationToAdmin(String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(adminEmail);
+        message.setSubject(subject);
+        message.setText(text);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            // Log the exception
+            e.printStackTrace();
+        }
+    }
+
+    public void sendNotificationToUser(String userEmail, String subject, String text) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(userEmail);
+        message.setSubject(subject);
+        message.setText(text);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            // Log the exception
+            e.printStackTrace();
+        }
+    }
+
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\MessageService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Message;
+import com.example.blog.repository.MessageRepository;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class MessageService {
+
+    private final MessageRepository messageRepository;
+
+    public MessageService(MessageRepository messageRepository){
+        this.messageRepository = messageRepository;
+    }
+
+    public Message saveMessage(Message message){
+        message.setTimestamp(LocalDateTime.now());
+        return messageRepository.save(message);
+    }
+
+    public List<Message> getMessagesByRoom(String room){
+        return messageRepository.findByRoomOrderByTimestampAsc(room);
+    }
+
+    public List<Message> getPrivateMessages(String recipient){
+        return messageRepository.findByRecipientOrderByTimestampAsc(recipient);
+    }
+
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\PostService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.User;
+import com.example.blog.repository.PostRepository;
+import com.example.blog.specification.PostSpecification;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class PostService {
+
+    private final PostRepository postRepository;
+
+    @Autowired
+    public PostService(PostRepository postRepository){
+        this.postRepository = postRepository;
+    }
+
+    public List<Post> findAll(){
+        return postRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    public Optional<Post> findById(Long id){
+        return postRepository.findById(id);
+    }
+
+    public Post save(Post post){
+        return postRepository.save(post);
+    }
+
+    public void deleteById(Long id){
+        postRepository.deleteById(id);
+    }
+
+    public List<Post> findByAuthor(User author){
+        return postRepository.findByAuthor(author, Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    public Page<Post> searchPosts(String title, String tag, String authorEmail, String authorName,
+                                  LocalDateTime createdAfter, LocalDateTime createdBefore,
+                                  Pageable pageable) {
+        Specification<Post> spec = Specification.where(PostSpecification.hasTitleLike(title))
+                .and(PostSpecification.hasTag(tag))
+                .and(PostSpecification.hasAuthorEmail(authorEmail))
+                .and(PostSpecification.hasAuthorName(authorName))
+                .and(PostSpecification.createdAfter(createdAfter))
+                .and(PostSpecification.createdBefore(createdBefore));
+        return postRepository.findAll(spec, pageable);
+    }
+
+    public List<Post> findReportedPosts() {
+        return postRepository.findByReportedTrue();
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\ReactionService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Reaction;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import com.example.blog.repository.ReactionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class ReactionService {
+
+    private final ReactionRepository reactionRepository;
+
+    @Autowired
+    public ReactionService(ReactionRepository reactionRepository){
+        this.reactionRepository = reactionRepository;
+    }
+
+    public Optional<Reaction> findByUserAndPost(User user, Post post){
+        return reactionRepository.findByUserAndPost(user, post);
+    }
+
+    public Reaction save(Reaction reaction){
+        return reactionRepository.save(reaction);
+    }
+
+    public long countByPostAndType(Post post, String type) {
+        return reactionRepository.countByPostAndType(post, type);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\RoomService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Room;
+import com.example.blog.repository.RoomRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class RoomService {
+
+    private final RoomRepository roomRepository;
+
+    public RoomService(RoomRepository roomRepository){
+        this.roomRepository = roomRepository;
+    }
+
+    public List<Room> findAllRooms(){
+        return roomRepository.findAll();
+    }
+
+    public Room createRoom(String name, String description){
+        Room room = Room.builder()
+                .name(name)
+                .description(description)
+                .build();
+        return roomRepository.save(room);
+    }
+
+    public Optional<Room> findByName(String name){
+        return roomRepository.findByName(name);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\SubscriptionService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Subscription;
+import com.example.blog.model.User;
+import com.example.blog.model.Post;
+import com.example.blog.repository.SubscriptionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class SubscriptionService {
+
+    private final SubscriptionRepository subscriptionRepository;
+
+    @Autowired
+    public SubscriptionService(SubscriptionRepository subscriptionRepository) {
+        this.subscriptionRepository = subscriptionRepository;
+    }
+
+    public Subscription subscribe(User user, Post post) {
+        Optional<Subscription> existing = subscriptionRepository.findByUserAndPost(user, post);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        Subscription subscription = Subscription.builder()
+                .user(user)
+                .post(post)
+                .build();
+        return subscriptionRepository.save(subscription);
+    }
+
+    public void unsubscribe(User user, Post post) {
+        subscriptionRepository.findByUserAndPost(user, post)
+                .ifPresent(subscriptionRepository::delete);
+    }
+
+    public List<Subscription> findByPost(Post post) {
+        return subscriptionRepository.findByPost(post);
+    }
+
+    public boolean isSubscribed(User user, Post post) {
+        return subscriptionRepository.findByUserAndPost(user, post).isPresent();
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\TagService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Tag;
+import com.example.blog.repository.TagRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class TagService {
+
+    private final TagRepository tagRepository;
+
+    @Autowired
+    public TagService(TagRepository tagRepository) {
+        this.tagRepository = tagRepository;
+    }
+
+    public Tag findOrCreateTag(String name) {
+        return tagRepository.findByName(name)
+                .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
+    }
+
+    public Tag save(Tag tag) {
+        return tagRepository.save(tag);
+    }
+
+    public List<Tag> findAll() {
+        return tagRepository.findAll();
+    }
+
+    public Optional<Tag> findById(Long id) {
+        return tagRepository.findById(id);
+    }
+
+    public Optional<Tag> findByName(String name){
+        return tagRepository.findByName(name);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\UserProfileService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.User;
+import com.example.blog.model.UserProfile;
+import com.example.blog.repository.UserProfileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class UserProfileService {
+
+    private final UserProfileRepository userProfileRepository;
+
+    @Value("${app.upload.dir.profile-images}")
+    private String uploadDir;
+
+    @Autowired
+    public UserProfileService(UserProfileRepository userProfileRepository){
+        this.userProfileRepository = userProfileRepository;
+    }
+
+    public Optional<UserProfile> findByUser(User user){
+        return userProfileRepository.findByUser(user);
+    }
+
+    public Optional<UserProfile> findByUserEmail(String email){
+        return userProfileRepository.findByUserEmail(email);
+    }
+
+    public UserProfile createUserProfile(User user, String displayName) {
+        UserProfile profile = UserProfile.builder()
+                .user(user)
+                .displayName(displayName)
+                .bio("")
+                .isPublic(true)
+                .updatedAt(LocalDateTime.now())
+                .build();
+        return userProfileRepository.save(profile);
+    }
+
+    public UserProfile updateUserProfile(UserProfile profile){
+        profile.setUpdatedAt(LocalDateTime.now());
+        return userProfileRepository.save(profile);
+    }
+
+    /**
+     * Handles profile image upload and updates the profileImagePath.
+     *
+     * @param profile      The UserProfile to update.
+     * @param profileImage The uploaded MultipartFile for the profile image.
+     * @return The updated UserProfile.
+     * @throws IOException If an error occurs during file handling.
+     */
+    public UserProfile updateUserProfile(UserProfile profile, MultipartFile profileImage) throws IOException {
+        if (profileImage != null && !profileImage.isEmpty()) {
+            File uploadFolder = Paths.get(uploadDir).toFile();
+            if (!uploadFolder.exists()) {
+                uploadFolder.mkdirs();
+            }
+
+            String originalFilename = profileImage.getOriginalFilename();
+            String extension = "";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
+            }
+            String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+            File destinationFile = Paths.get(uploadDir, uniqueFilename).toFile();
+            profileImage.transferTo(destinationFile);
+
+            if (profile.getProfileImagePath() != null) {
+                String oldImageName = profile.getProfileImagePath().replace("/profile-images/", "");
+                File oldImage = Paths.get(uploadDir, oldImageName).toFile();
+                if (oldImage.exists()) {
+                    oldImage.delete();
+                }
+            }
+
+            profile.setProfileImagePath("/profile-images/" + uniqueFilename);
+        }
+
+        profile.setUpdatedAt(LocalDateTime.now());
+        return userProfileRepository.save(profile);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\service\UserService.java -----
+package com.example.blog.service;
+
+import com.example.blog.model.Role;
+import com.example.blog.model.User;
+import com.example.blog.repository.RoleRepository;
+import com.example.blog.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.Set;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
+
+    @Autowired
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, RoleRepository roleRepository){
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.roleRepository = roleRepository;
+    }
+
+    @Transactional
+    public User registerUser(User user){
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        Role userRole = roleRepository.findByName("ROLE_USER")
+                .orElseThrow(() -> new RuntimeException("ROLE_USER not found"));
+        user.getRoles().add(userRole);
+        return userRepository.save(user);
+    }
+
+    public Optional<User> findByEmail(String email){
+        return userRepository.findByEmail(email);
+    }
+
+    public Optional<User> findById(Long id){
+        return userRepository.findById(id);
+    }
+}
+
+
+----- C:\Users\ALLMIGHTY\Desktop\blog\SpringBlog-Thymeleaf-main\src\main\java\com\example\blog\specification\PostSpecification.java -----
+package com.example.blog.specification;
+
+import com.example.blog.model.Post;
+import com.example.blog.model.Tag;
+import com.example.blog.model.User;
+import org.springframework.data.jpa.domain.Specification;
+
+import jakarta.persistence.criteria.*;
+import java.time.LocalDateTime;
+
+public class PostSpecification {
+
+    public static Specification<Post> hasTitleLike(String title) {
+        return (root, query, criteriaBuilder) -> {
+            if (title == null || title.isEmpty()) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), "%" + title.toLowerCase() + "%");
+        };
+    }
+
+    public static Specification<Post> hasTag(String tagName) {
+        return (root, query, criteriaBuilder) -> {
+            if (tagName == null || tagName.isEmpty()) {
+                return criteriaBuilder.conjunction();
+            }
+            Join<Post, Tag> tags = root.join("tags", JoinType.INNER);
+            return criteriaBuilder.equal(criteriaBuilder.lower(tags.get("name")), tagName.toLowerCase());
+        };
+    }
+
+    public static Specification<Post> hasAuthorEmail(String email) {
+        return (root, query, criteriaBuilder) -> {
+            if (email == null || email.isEmpty()) {
+                return criteriaBuilder.conjunction();
+            }
+            Join<Post, User> author = root.join("author", JoinType.INNER);
+            return criteriaBuilder.equal(criteriaBuilder.lower(author.get("email")), email.toLowerCase());
+        };
+    }
+
+    public static Specification<Post> hasAuthorName(String name) {
+        return (root, query, criteriaBuilder) -> {
+            if (name == null || name.isEmpty()) {
+                return criteriaBuilder.conjunction();
+            }
+            Join<Post, User> author = root.join("author", JoinType.INNER);
+            return criteriaBuilder.like(criteriaBuilder.lower(author.get("name")), "%" + name.toLowerCase() + "%");
+        };
+    }
+
+    public static Specification<Post> createdAfter(LocalDateTime dateTime) {
+        return (root, query, criteriaBuilder) -> {
+            if (dateTime == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), dateTime);
+        };
+    }
+
+    public static Specification<Post> createdBefore(LocalDateTime dateTime) {
+        return (root, query, criteriaBuilder) -> {
+            if (dateTime == null) {
+                return criteriaBuilder.conjunction();
+            }
+            return criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), dateTime);
+        };
+    }
+}
+
+

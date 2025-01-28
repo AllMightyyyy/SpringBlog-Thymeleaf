@@ -1,0 +1,289 @@
+<div th:fragment="chat">
+    <div id="chat-popup" class="chat-popup">
+        <div class="chat-header">
+            <span id="chat-title">Global Chat</span>
+            <button id="close-chat" class="close-chat">&times;</button>
+        </div>
+        <div id="chat" class="chat-body"></div>
+        <div class="chat-footer">
+            <input type="text" id="chat-message" class="form-control" placeholder="Type your message here..." />
+            <button id="send-chat" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+
+    <button id="open-chat" class="open-chat-btn"><i class="fas fa-comments"></i></button>
+
+    <style>
+        .chat-popup {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            right: 15px;
+            border: 1px solid var(--input-border-color);
+            z-index: 1000;
+            width: 350px;
+            background-color: var(--card-bg-color);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .chat-header {
+            background-color: var(--primary-color);
+            color: var(--button-text-color);
+            padding: 12px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-body {
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: var(--card-bg-color);
+            color: var(--text-color);
+        }
+        .chat-footer {
+            padding: 10px;
+            background-color: var(--input-bg-color);
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .chat-footer button {
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: background-color 0.2s;
+        }
+        .chat-footer button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        .chat-footer input {
+            border: 1px solid var(--input-border-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            flex: 1;
+            background-color: var(--input-bg-color);
+            color: var(--text-color);
+        }
+        .open-chat-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .open-chat-btn:hover {
+            background-color: var(--primary-hover-color);
+            transform: scale(1.05);
+        }
+        .close-chat {
+            background: none;
+            border: none;
+            color: var(--button-text-color);
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background-color: var(--input-bg-color);
+            color: var(--text-color);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .chat-message em {
+            color: #a0a0a0;
+            font-style: italic;
+        }
+
+        .chat-message strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        .chat-message.join {
+            background-color: var(--alert-success-bg);
+            color: var(--alert-success-text);
+            border-left: 4px solid var(--alert-success-border);
+        }
+        .chat-message.leave {
+            background-color: var(--alert-danger-bg);
+            color: var(--alert-danger-text);
+            border-left: 4px solid var(--alert-danger-border);
+        }
+        .chat-message.chat {
+            background-color: var(--input-bg-color);
+            border-left: 4px solid var(--primary-color);
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        let stompClient = null;
+        let username = /*[[${displayName}]]*/ 'Anonymous';
+        let subscription = null;
+        let isConnected = false;
+
+        function connectChat() {
+            if (isConnected) return;
+
+            var socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            stompClient.connect({}, function(frame) {
+                console.log('Connected: ' + frame);
+                isConnected = true;
+
+                // Extract username from frame if available
+                if (frame.headers['user-name']) {
+                    username = frame.headers['user-name'];
+                }
+
+                subscription = stompClient.subscribe('/topic/global', function(messageOutput) {
+                    const message = JSON.parse(messageOutput.body);
+                    console.log('Received message:', message); // Debug log
+                    showChatMessage(message);
+                });
+
+                // Announce user joining
+                stompClient.send("/app/chat.addUser",
+                    {},
+                    JSON.stringify({
+                        sender: username,
+                        type: 'JOIN',
+                        room: 'global'
+                    })
+                );
+            }, function(error) {
+                console.error('STOMP error:', error);
+                isConnected = false;
+            });
+        }
+
+        function disconnectChat() {
+            if (subscription) {
+                subscription.unsubscribe();
+            }
+            if (stompClient && stompClient.connected) {
+                // Send leave message before disconnecting
+                stompClient.send("/app/chat.removeUser",
+                    {},
+                    JSON.stringify({
+                        sender: username,
+                        type: 'LEAVE',
+                        room: 'global'
+                    })
+                );
+                stompClient.disconnect(function() {
+                    console.log('Disconnected');
+                    isConnected = false;
+                });
+            }
+        }
+
+        function sendChatMessage() {
+            var messageInput = document.getElementById('chat-message');
+            var messageContent = messageInput.value.trim();
+
+            if (messageContent && stompClient && stompClient.connected) {
+                var chatMessage = {
+                    sender: username,
+                    content: messageContent,
+                    type: 'CHAT',
+                    room: 'global'
+                };
+
+                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+                messageInput.value = '';
+            }
+        }
+
+        function showChatMessage(message) {
+            console.log('Showing message:', message);
+            var chat = document.getElementById('chat');
+            if (!chat) {
+                console.error("Chat container not found!");
+                return;
+            }
+
+            var messageElement = document.createElement('div');
+
+            switch(message.type) {
+                case 'JOIN':
+                    messageElement.className = 'chat-message join';
+                    messageElement.innerHTML = `<em>${message.sender} joined the chat</em>`;
+                    break;
+                case 'LEAVE':
+                    messageElement.className = 'chat-message leave';
+                    messageElement.innerHTML = `<em>${message.sender} left the chat</em>`;
+                    break;
+                case 'CHAT':
+                    messageElement.className = 'chat-message chat';
+                    messageElement.innerHTML = `<strong>${message.sender}:</strong> ${message.content}`;
+                    break;
+                default:
+                    return;
+            }
+
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const chatPopup = document.getElementById('chat-popup');
+            const openChatBtn = document.getElementById('open-chat');
+            const closeChatBtn = document.getElementById('close-chat');
+            const sendChatBtn = document.getElementById('send-chat');
+            const chatMessageInput = document.getElementById('chat-message');
+
+            openChatBtn.addEventListener('click', function () {
+                chatPopup.style.display = 'block';
+                if (!isConnected) {
+                    connectChat();
+                }
+            });
+
+            closeChatBtn.addEventListener('click', function () {
+                chatPopup.style.display = 'none';
+                disconnectChat();
+            });
+
+            sendChatBtn.addEventListener('click', sendChatMessage);
+
+            chatMessageInput.addEventListener('keyup', function (event) {
+                if (event.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (isConnected) {
+                disconnectChat();
+            }
+        });
+        /*]]>*/
+    </script>
+</div>

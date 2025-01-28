@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title th:text="'Private Chat with ' + ${recipientName}">Private Chat</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="/css/styles.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+
+<div class="container py-5 flex-grow-1">
+  <h2 th:text="'Private Chat with ' + ${recipientName}">Private Chat</h2>
+  <div id="chat" class="chat-container"></div>
+  <div class="input-group">
+    <input type="text" id="message" class="form-control" placeholder="Type your message here..." aria-label="Message" />
+    <button id="send" class="btn btn-primary">Send</button>
+  </div>
+</div>
+
+<footer class="footer text-center py-3">
+  <div class="container">
+    <span>&copy; 2025 Blogio. All rights reserved.</span>
+  </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+<script>
+  var stompClient = null;
+  var username = /*[[${#authentication.name}]]*/ 'Anonymous';
+  var recipient = /*[[${recipientUsername}]]*/ 'user';
+
+  function connect() {
+    var socket = new SockJS('/ws');
+    stompClient = Stomp.over(socket);
+    stompClient.connect({}, function(frame) {
+      console.log('Connected: ' + frame);
+      stompClient.subscribe('/user/' + username + '/queue/messages', function(messageOutput){
+        showMessage(JSON.parse(messageOutput.body));
+      });
+    });
+  }
+
+  function sendMessage() {
+    var messageContent = document.getElementById('message').value.trim();
+    if(messageContent && stompClient){
+      var chatMessage = {
+        sender: username,
+        recipient: recipient,
+        content: messageContent,
+        type: 'CHAT'
+      };
+      stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+      showMessage(chatMessage);
+      document.getElementById('message').value = '';
+    }
+  }
+
+  function showMessage(message) {
+    var chat = document.getElementById('chat');
+    var messageElement = document.createElement('div');
+    messageElement.classList.add('chat-message');
+    messageElement.innerHTML = '<strong>' + message.sender + ':</strong> ' + message.content;
+    chat.appendChild(messageElement);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  document.getElementById('send').addEventListener('click', sendMessage);
+  document.getElementById('message').addEventListener('keyup', function(event) {
+    if(event.key === 'Enter'){
+      sendMessage();
+    }
+  });
+
+  connect();
+
+  window.addEventListener('beforeunload', function() {
+    disconnect();
+  });
+
+  function disconnect() {
+    if (stompClient) {
+      stompClient.disconnect();
+    }
+  }
+</script>
+</body>
+</html>

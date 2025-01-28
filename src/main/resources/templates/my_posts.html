@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>My Posts</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="/css/styles.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.css" rel="stylesheet" type="text/css" />
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script src="/js/theme-switcher.js"></script>
+</head>
+<body class="d-flex flex-column min-vh-100" th:classappend="${theme}">
+
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+<div class="container py-5 flex-grow-1">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <h2 class="mb-4 text-light">My Posts</h2>
+
+    <div th:if="${#lists.isEmpty(posts)}" class="text-center">
+        <p>You haven't created any posts yet.</p>
+    </div>
+
+    <div th:each="post : ${posts}" class="post-card">
+        <div class="post-content">
+            <h5 class="post-title" th:text="${post.title}">Post Title</h5>
+            <p class="text-muted">
+                By
+                <a th:href="@{'/profiles/' + ${post.author.id}}" class="text-info" th:text="${post.author.name}">Author</a>
+                &bull;
+                <span th:text="${#temporals.format(post.createdAt, 'dd MMM yyyy HH:mm')}">Date</span>
+            </p>
+            <div class="post-excerpt" th:utext="${post.content}">
+            </div>
+            <a th:href="@{'/posts/' + ${post.id}}" class="btn btn-primary-custom">
+                <i class="fas fa-book-open"></i> Read More
+            </a>
+            <a th:href="@{'/posts/' + ${post.id} + '/edit'}" class="btn btn-warning-custom">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <form th:action="@{'/posts/' + ${post.id} + '/delete'}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-danger-custom"
+                        onclick="return confirm('Are you sure you want to delete this post?');">
+                    <i class="fas fa-trash-alt"></i> Delete
+                </button>
+            </form>
+        </div>
+        <div>
+            <img th:if="${post.imagePath != null}" th:src="${post.imagePath}" alt="Post Image" class="post-image"/>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments/chat :: chat}"></div>
+
+<footer class="footer text-center py-3">
+    <div class="container">
+        <span>&copy; 2025 Blogio. All rights reserved.</span>
+    </div>
+</footer>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
